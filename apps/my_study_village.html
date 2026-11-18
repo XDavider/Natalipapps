@@ -193,7 +193,7 @@
               <div class="w-full h-2.5 bg-cream-beige rounded-full overflow-hidden border border-wood/20">
                 <div id="canvasNextMilestoneBar" class="h-full bg-gradient-to-r from-sage to-gold rounded-full transition-all duration-500" style="width: 0%"></div>
               </div>
-              <p class="text-[11px] text-wood-light mt-1">Arrastra para explorar · Toca edificios, perritos o vecinos para interactuar 🐶</p>
+              <p class="text-[11px] text-wood-light mt-1">Arrastra para rotar · Rueda para zoom · Toca edificios, perritos o vecinos 🐶</p>
             </div>
 
             <!-- Quick Future Tour Toggle -->
@@ -203,6 +203,9 @@
               </button>
             </div>
           </div>
+
+          <!-- Hover 3D Tooltip -->
+          <div id="hoverTooltip3D" class="hidden absolute z-25 pointer-events-none px-3 py-1.5 rounded-xl bg-cream/95 border-2 border-wood/60 shadow-lg text-xs font-bold text-wood-dark whitespace-nowrap"></div>
 
           <!-- Interactive Entity Popover Card -->
           <div id="entityPopover" class="hidden absolute z-30 max-w-xs w-72 bg-cream/98 backdrop-blur-md border-2 border-wood rounded-2xl p-3.5 shadow-xl animate-pop">
@@ -687,10 +690,14 @@
 
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-  <!-- SCRIPTS MODULARES PROFESIONALES -->
+  <!-- THREE.JS 3D ENGINE (CDN r147) & SCRIPTS MODULARES PROFESIONALES -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
   <script src="my_study_village/js/core/data.js"></script>
   <script src="my_study_village/js/core/state.js"></script>
   <script src="my_study_village/js/core/timer.js"></script>
+  <script src="my_study_village/js/village/textures3d.js"></script>
+  <script src="my_study_village/js/village/builders3d.js"></script>
   <script src="my_study_village/js/village/renderer.js"></script>
   <script src="my_study_village/js/ui/modals.js"></script>
   <script src="my_study_village/js/main.js"></script>

@@ -1,80 +1,120 @@
 /* ==========================================================================
-   My Study Village · Pixel Art / Organic Cozy Graphics Engine
-   Stardew Valley / Animal Crossing hand-crafted visual style:
-   - Natural curved river with organic banks and deep water gradients
-   - Natural ground with rich grass patches, clumps of wildflowers & herbs
-   - Curved cobblestone village trails and dirt roads (not grid squares)
-   - Real cozy building art: mossy stone walls, timber framing, tiled roofs,
-     chimneys, warm glowing windows, flower boxes and ivy
-   - Detailed trees with fluffy foliage clusters and autumn leaves
-   - Animated pets: dogs that trot, sniff, wag tails; cats, ducks
+   My Study Village · 3D Cozy Diorama Engine (Three.js r147)
+   Stardew Valley & Animal Crossing inspired floating island diorama:
+   - Rounded island base with mossy rock cliff strata & waterfall
+   - Procedural meadow grass, wildflower clusters, rounded trees & mossy rocks
+   - Curved animated river with translucent water, lily pads & swimming fish
+   - Cobblestone paths, 25 progressive 3D buildings, street lanterns & bunting
+   - Living ambient animals: stray dogs, sleeping cats, ducks, butterflies,
+     villagers, steam train, hot air balloons, clouds, fireflies & weather
+   - Smooth OrbitControls + Raycaster hover highlight & click popovers
    ========================================================================== */
 'use strict';
 
-const canvas = document.getElementById('villageCanvas');
-const ctx = canvas ? canvas.getContext('2d') : null;
-
-const camera = {
-  x: 0,
-  y: 20,
-  zoom: 1.0,
-  isDragging: false,
-  dragMoved: false,
-  lastMouseX: 0,
-  lastMouseY: 0
-};
-
-const TILE_W = 92;
-const TILE_H = 46;
-const GRID_RADIUS = 6;
-
-function isoToScreen(gx, gy) {
-  return {
-    x: (gx - gy) * (TILE_W / 2),
-    y: (gx + gy) * (TILE_H / 2)
-  };
-}
-
-function screenToWorld(sx, sy) {
-  const rect = canvas.getBoundingClientRect();
-  const cx = rect.width / 2 + camera.x;
-  const cy = rect.height / 2 + camera.y;
-  return {
-    x: (sx - cx) / camera.zoom,
-    y: (sy - cy) / camera.zoom
-  };
-}
-
-function worldToScreen(wx, wy) {
-  const wrap = document.getElementById('villageCanvasWrapper');
-  return {
-    x: wrap.clientWidth / 2 + camera.x + wx * camera.zoom,
-    y: wrap.clientHeight / 2 + camera.y + wy * camera.zoom
-  };
-}
-
+// Public state consumed by modals.js and main.js
 let activeVillagers = [];
-let streetDogs = [];
-let clouds = [];
-let smokeParticles = [];
-let butterflies = [];
-let fireflies = [];
-let snowFlakes = [];
-let petals = [];
-let trainProgress = 0;
-let hitboxes = [];
-
 const constructionAnimations = {};
 
-function initAmbientEntities() {
-  clouds = Array.from({ length: 5 }, (_, i) => ({
-    x: -600 + i * 280,
-    y: -300 + (i % 3) * 75,
-    scale: 0.8 + (i % 3) * 0.25,
-    speed: 7 + (i % 3) * 2.5
-  }));
+(function () {
+  const CELL = 1.65;
+  const ISLAND_HALF = 10.4;
+  const ISLAND_CORNER = 1.45;
+  const RIVER_BASE_Z = 2.95 * CELL; // Passes cleanly under bridge_pond (0, 3)
 
-  streetDogs = [
+  function riverCenterZ(wx) {
+    return RIVER_BASE_Z + Math.sin(wx * 0.28) * 0.30;
+  }
+
+  function riverHalfWidth(wx) {
+    return 0.66 + Math.cos(wx * 0.35) * 0.06;
+  }
+
+  function isInRiverWorld(wx, wz, padding = 0.25) {
+    return Math.abs(wz - riverCenterZ(wx)) < riverHalfWidth(wx) + padding;
+  }
+
+  function gridToWorld(gx, gy) {
+    return { x: gx * CELL, z: gy * CELL };
+  }
+
+  // Three.js core objects
+  let scene = null;
+  let camera = null;
+  let renderer = null;
+  let controls = null;
+  let raycaster = null;
+  let initialized = false;
+
+  // Lighting & atmosphere
+  let hemiLight = null;
+  let sunLight = null;
+  let fillLight = null;
+  let starField = null;
+  let skyCanvasMesh = null;
+
+  // Scene groups
+  let worldGroup = null;
+  let terrainGroup = null;
+  let meadowNorthMesh = null;
+  let meadowSouthMesh = null;
+  let riverWaterMat = null;
+  let riverWaterTex = null;
+  let waterfallTex = null;
+  let waterfallFoamGroup = null;
+  let roadGroup = null;
+  let floraGroup = null;
+  let buildingsGroup = null;
+  let decorationsGroup = null;
+  let villagersGroup = null;
+  let dogsGroup = null;
+  let ambientGroup = null;
+  let sparklesGroup = null;
+
+  // Dynamic entity records
+  let treeRecords = [];
+  let flowerRecords = [];
+  let buildingRecords = new Map(); // id -> { group, milestone, bounceT }
+  let villagerRecords = new Map(); // id -> { group, data, bounceT }
+  let dogRecords = [];
+  let fishRecords = [];
+  let duckRecords = [];
+  let butterflyRecords = [];
+  let cloudRecords = [];
+  let balloonRecords = [];
+  let lanternRecords = [];
+  let trainObj = null;
+  let trainProgress = 0;
+  let fireflyPoints = null;
+  let snowPoints = null;
+  let petalPoints = null;
+
+  // Signature caches for reactive updates
+  let lastSeason = null;
+  let lastStyle = null;
+  let lastUnlockedKey = null;
+  let lastDecoKey = null;
+  let lastVillagerKey = null;
+
+  // Pointer & Raycaster hover/click state
+  const pointerNDC = new THREE.Vector2(-99, -99);
+  let pointerDownPos = { x: 0, y: 0 };
+  let isPointerInside = false;
+  let hoveredRoot = null;
+  let lastFrameNow = performance.now();
+
+  // Camera animation target
+  const DEFAULT_CAM_POS = new THREE.Vector3(17.5, 16.0, 17.5);
+  const DEFAULT_TARGET = new THREE.Vector3(0, 0.35, 0.55);
+  let camAnimActive = false;
+  const camGoalPos = new THREE.Vector3();
+  const camGoalTarget = new THREE.Vector3();
+
+  // Offscreen render target for celebration mini preview (reuses same WebGL context)
+  let miniRT = null;
+  let miniScene = null;
+  let miniCam = null;
+
+  const STREET_DOG_DEFS = [
     {
       id: 'dog_caramelo',
       name: 'Caramelo',
@@ -82,11 +122,9 @@ function initAmbientEntities() {
       bodyColor: '#D9822B',
       bellyColor: '#FFF3E0',
       earColor: '#B05E17',
-      gx: 0.6, gy: 0.8,
-      targetGx: 0, targetGy: 1,
-      state: 'stroll',
-      stateTimer: 3,
-      tailWag: 0
+      collarColor: '#EC4899',
+      x: 0.9, z: 1.5,
+      alwaysAvailable: true
     },
     {
       id: 'dog_pipa',
@@ -95,11 +133,9 @@ function initAmbientEntities() {
       bodyColor: '#FFFFFF',
       bellyColor: '#E2E8F0',
       earColor: '#33271E',
-      gx: -1.2, gy: 0.5,
-      targetGx: -1, targetGy: -1,
-      state: 'sit',
-      stateTimer: 5,
-      tailWag: 0
+      collarColor: '#60A5FA',
+      x: -1.8, z: 0.7,
+      alwaysAvailable: false
     },
     {
       id: 'dog_mochi',
@@ -108,1319 +144,1551 @@ function initAmbientEntities() {
       bodyColor: '#E6A15C',
       bellyColor: '#FFFFFF',
       earColor: '#A85A22',
-      gx: 1.5, gy: -0.5,
-      targetGx: 2, targetGy: -1,
-      state: 'stroll',
-      stateTimer: 4,
-      tailWag: 0
+      collarColor: '#34D399',
+      x: 2.2, z: -0.6,
+      alwaysAvailable: false
     }
   ];
 
-  butterflies = Array.from({ length: 14 }, (_, i) => ({
-    gx: (Math.random() - 0.5) * 8,
-    gy: (Math.random() - 0.5) * 8,
-    phase: Math.random() * Math.PI * 2,
-    color: ['#F472B6', '#FBBF24', '#60A5FA', '#C084FC', '#34D399'][i % 5]
-  }));
+  const ROAD_SEGMENTS = [
+    // Main North-South Avenue (gx = 0, gy = -4.5 .. 2.2 & across bridge 3.8 .. 4.8)
+    { x1: 0, z1: -4.5 * CELL, x2: 0, z2: 2.2 * CELL, width: 0.85 },
+    { x1: 0, z1: 3.7 * CELL, x2: 0, z2: 4.8 * CELL, width: 0.75 },
+    // Central East-West Avenue (gy = 0)
+    { x1: -4.3 * CELL, z1: 0, x2: 4.3 * CELL, z2: 0, width: 0.85 },
+    // South cottage loop (gy = 1.45)
+    { x1: -2.2 * CELL, z1: 1.45 * CELL, x2: 2.2 * CELL, z2: 1.45 * CELL, width: 0.65 },
+    // North market square spur (gy = -1.6)
+    { x1: -1.4 * CELL, z1: -1.6 * CELL, x2: 2.4 * CELL, z2: -1.6 * CELL, width: 0.65 }
+  ];
 
-  fireflies = Array.from({ length: 28 }, () => ({
-    gx: (Math.random() - 0.5) * 10,
-    gy: (Math.random() - 0.5) * 10,
-    phase: Math.random() * Math.PI * 2
-  }));
+  /* ------------------------------------------------------------------------
+     Three.js Scene Initialization
+     ------------------------------------------------------------------------ */
+  function ensureThreeInitialized() {
+    if (initialized) return true;
+    const canvas = document.getElementById('villageCanvas');
+    const wrap = document.getElementById('villageCanvasWrapper');
+    if (!canvas || !wrap || typeof THREE === 'undefined') return false;
 
-  snowFlakes = Array.from({ length: 65 }, () => ({
-    x: (Math.random() - 0.5) * 1400,
-    y: (Math.random() - 0.5) * 900,
-    r: 1.5 + Math.random() * 2.2,
-    speedY: 18 + Math.random() * 22,
-    drift: Math.random() * Math.PI * 2
-  }));
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0xDDEEF5, 0.011);
 
-  petals = Array.from({ length: 32 }, () => ({
-    x: (Math.random() - 0.5) * 1400,
-    y: (Math.random() - 0.5) * 900,
-    speedY: 12 + Math.random() * 14,
-    phase: Math.random() * Math.PI * 2
-  }));
-}
+    const w = Math.max(1, wrap.clientWidth);
+    const h = Math.max(1, wrap.clientHeight);
+    camera = new THREE.PerspectiveCamera(34, w / h, 0.5, 180);
+    camera.position.copy(DEFAULT_CAM_POS);
 
-const ROAD_TILES = new Set([
-  '0,0', '0,1', '0,-1', '0,-2', '0,-3', '0,-4',
-  '1,0', '2,0', '3,0', '4,0',
-  '-1,0', '-2,0', '-3,0', '-4,0',
-  '1,1', '2,1', '3,1',
-  '-1,1', '-2,1',
-  '1,-1', '2,-1', '3,-1',
-  '-1,-1', '-2,-1',
-  '0,2', '0,3'
-]);
+    renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: false,
+      powerPreference: 'high-performance'
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(w, h, false);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.06;
 
-function isRiverTile(gx, gy) {
-  return (gy === 3 && gx >= -3 && gx <= 5) || (gx === 4 && gy >= 2 && gy <= 5);
-}
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.target.copy(DEFAULT_TARGET);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.rotateSpeed = 0.72;
+    controls.panSpeed = 0.7;
+    controls.zoomSpeed = 0.85;
+    controls.minPolarAngle = 0.36;
+    controls.maxPolarAngle = Math.PI / 2.28;
+    controls.minDistance = 9.5;
+    controls.maxDistance = 38;
 
-function syncVillagersFromMilestones() {
-  const unlocked = getUnlockedMilestones();
-  const desired = unlocked.filter(m => m.villager).map(m => ({
-    ...m.villager,
-    milestoneName: m.name,
-    homeGx: m.gx,
-    homeGy: m.gy
-  }));
+    controls.addEventListener('start', () => {
+      camAnimActive = false;
+    });
 
-  activeVillagers = desired.map((dv, idx) => {
-    const existing = activeVillagers.find(v => v.id === dv.id);
-    if (existing) {
+    raycaster = new THREE.Raycaster();
+
+    // Warm cozy lighting
+    hemiLight = new THREE.HemisphereLight(0xFFF6E8, 0x8BA88E, 0.75);
+    scene.add(hemiLight);
+
+    sunLight = new THREE.DirectionalLight(0xFFF1D6, 1.05);
+    sunLight.position.set(14, 22, 12);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 2;
+    sunLight.shadow.camera.far = 60;
+    sunLight.shadow.camera.left = -15;
+    sunLight.shadow.camera.right = 15;
+    sunLight.shadow.camera.top = 15;
+    sunLight.shadow.camera.bottom = -15;
+    sunLight.shadow.bias = -0.0005;
+    sunLight.shadow.normalBias = 0.03;
+    scene.add(sunLight);
+
+    fillLight = new THREE.DirectionalLight(0xB8D8F0, 0.32);
+    fillLight.position.set(-14, 10, -12);
+    scene.add(fillLight);
+
+    // Groups hierarchy
+    worldGroup = new THREE.Group();
+    terrainGroup = new THREE.Group();
+    roadGroup = new THREE.Group();
+    floraGroup = new THREE.Group();
+    buildingsGroup = new THREE.Group();
+    decorationsGroup = new THREE.Group();
+    villagersGroup = new THREE.Group();
+    dogsGroup = new THREE.Group();
+    ambientGroup = new THREE.Group();
+    sparklesGroup = new THREE.Group();
+
+    worldGroup.add(
+      terrainGroup,
+      roadGroup,
+      floraGroup,
+      buildingsGroup,
+      decorationsGroup,
+      villagersGroup,
+      dogsGroup,
+      ambientGroup,
+      sparklesGroup
+    );
+    scene.add(worldGroup);
+
+    buildSkyDomeAndStars();
+    buildFloatingIslandDiorama();
+    buildPerimeterNature();
+    buildAmbientLife();
+
+    initialized = true;
+    return true;
+  }
+
+  /* ------------------------------------------------------------------------
+     Sky Backdrop & Night Stars
+     ------------------------------------------------------------------------ */
+  function buildSkyDomeAndStars() {
+    const geo = new THREE.SphereGeometry(90, 20, 14);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xCFE8F3,
+      side: THREE.BackSide,
+      fog: false
+    });
+    skyCanvasMesh = new THREE.Mesh(geo, mat);
+    scene.add(skyCanvasMesh);
+
+    // Night stars
+    const count = 180;
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI * 0.45;
+      const r = 74;
+      pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      pos[i * 3 + 1] = r * Math.cos(phi) + 8;
+      pos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+    }
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const starMat = new THREE.PointsMaterial({
+      color: 0xFFF7D6,
+      size: 0.45,
+      transparent: true,
+      opacity: 0,
+      fog: false
+    });
+    starField = new THREE.Points(starGeo, starMat);
+    scene.add(starField);
+  }
+
+  /* ------------------------------------------------------------------------
+     Floating Island Base, Carved Riverbed, Water & Waterfall
+     ------------------------------------------------------------------------ */
+  function createRoundedSquareShape(half, radius) {
+    const s = new THREE.Shape();
+    s.moveTo(-half + radius, -half);
+    s.lineTo(half - radius, -half);
+    s.quadraticCurveTo(half, -half, half, -half + radius);
+    s.lineTo(half, half - radius);
+    s.quadraticCurveTo(half, half, half - radius, half);
+    s.lineTo(-half + radius, half);
+    s.quadraticCurveTo(-half, half, -half, half - radius);
+    s.lineTo(-half, -half + radius);
+    s.quadraticCurveTo(-half, -half, -half + radius, -half);
+    return s;
+  }
+
+  function normalizePlanarUVs(geometry, half) {
+    const pos = geometry.attributes.position;
+    const uv = geometry.attributes.uv;
+    if (!pos || !uv) return;
+    const span = half * 2;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      uv.setXY(i, (x + half) / span, (y + half) / span);
+    }
+    uv.needsUpdate = true;
+  }
+
+  function buildFloatingIslandDiorama() {
+    const season = (typeof state !== 'undefined' && state.season) || 'spring';
+    const sPal = SEASON_PALETTES[season] || SEASON_PALETTES.spring;
+
+    // 1. Solid Earth & Rock Cliff Core (underneath grass banks, forming carved riverbed)
+    const baseShape = createRoundedSquareShape(ISLAND_HALF, ISLAND_CORNER);
+    const coreGeo = new THREE.ExtrudeGeometry(baseShape, {
+      depth: 1.55,
+      bevelEnabled: true,
+      bevelThickness: 0.14,
+      bevelSize: 0.14,
+      bevelSegments: 2
+    });
+    coreGeo.rotateX(Math.PI / 2);
+    const earthMat = new THREE.MeshStandardMaterial({ color: 0x7D5A3F, roughness: 0.95 });
+    const coreMesh = new THREE.Mesh(coreGeo, earthMat);
+    coreMesh.position.y = -0.41;
+    coreMesh.receiveShadow = true;
+    terrainGroup.add(coreMesh);
+
+    // Lower rock stratum taper
+    const rockGeo = new THREE.ExtrudeGeometry(createRoundedSquareShape(ISLAND_HALF - 0.55, 1.2), {
+      depth: 0.95,
+      bevelEnabled: true,
+      bevelThickness: 0.25,
+      bevelSize: 0.25,
+      bevelSegments: 2
+    });
+    rockGeo.rotateX(Math.PI / 2);
+    const rockMesh = new THREE.Mesh(
+      rockGeo,
+      new THREE.MeshStandardMaterial({ color: 0x624A3A, roughness: 0.96 })
+    );
+    rockMesh.position.y = -1.65;
+    terrainGroup.add(rockMesh);
+
+    // 2. North & South Grass Banks separated by the curved riverbed
+    const grassTex = window.VillageTextures.getGrassTexture(season);
+    const grassMat = new THREE.MeshStandardMaterial({
+      map: grassTex,
+      roughness: 0.92,
+      metalness: 0.02
+    });
+
+    const N = 32;
+    // Shape plane (sx, sy) mapped via rotateX(-Math.PI/2) => world (sx, 0, -sy) => sy = -wz
+    const northShape = new THREE.Shape();
+    northShape.moveTo(-ISLAND_HALF + ISLAND_CORNER, ISLAND_HALF);
+    northShape.lineTo(ISLAND_HALF - ISLAND_CORNER, ISLAND_HALF);
+    northShape.quadraticCurveTo(ISLAND_HALF, ISLAND_HALF, ISLAND_HALF, ISLAND_HALF - ISLAND_CORNER);
+    for (let i = N; i >= 0; i--) {
+      const wx = -ISLAND_HALF + (i / N) * (ISLAND_HALF * 2);
+      const wz = riverCenterZ(wx) - riverHalfWidth(wx);
+      northShape.lineTo(wx, -wz);
+    }
+    northShape.lineTo(-ISLAND_HALF, ISLAND_HALF - ISLAND_CORNER);
+    northShape.quadraticCurveTo(-ISLAND_HALF, ISLAND_HALF, -ISLAND_HALF + ISLAND_CORNER, ISLAND_HALF);
+
+    const northGeo = new THREE.ExtrudeGeometry(northShape, {
+      depth: 0.26,
+      bevelEnabled: true,
+      bevelThickness: 0.04,
+      bevelSize: 0.04,
+      bevelSegments: 2
+    });
+    normalizePlanarUVs(northGeo, ISLAND_HALF);
+    northGeo.rotateX(-Math.PI / 2);
+    meadowNorthMesh = new THREE.Mesh(northGeo, grassMat);
+    meadowNorthMesh.position.y = -0.30;
+    meadowNorthMesh.receiveShadow = true;
+    terrainGroup.add(meadowNorthMesh);
+
+    // South bank shape
+    const southShape = new THREE.Shape();
+    for (let i = 0; i <= N; i++) {
+      const wx = -ISLAND_HALF + (i / N) * (ISLAND_HALF * 2);
+      const wz = riverCenterZ(wx) + riverHalfWidth(wx);
+      if (i === 0) southShape.moveTo(wx, -wz);
+      else southShape.lineTo(wx, -wz);
+    }
+    southShape.lineTo(ISLAND_HALF, -ISLAND_HALF + ISLAND_CORNER);
+    southShape.quadraticCurveTo(ISLAND_HALF, -ISLAND_HALF, ISLAND_HALF - ISLAND_CORNER, -ISLAND_HALF);
+    southShape.lineTo(-ISLAND_HALF + ISLAND_CORNER, -ISLAND_HALF);
+    southShape.quadraticCurveTo(-ISLAND_HALF, -ISLAND_HALF, -ISLAND_HALF, -ISLAND_HALF + ISLAND_CORNER);
+    southShape.closePath();
+
+    const southGeo = new THREE.ExtrudeGeometry(southShape, {
+      depth: 0.26,
+      bevelEnabled: true,
+      bevelThickness: 0.04,
+      bevelSize: 0.04,
+      bevelSegments: 2
+    });
+    normalizePlanarUVs(southGeo, ISLAND_HALF);
+    southGeo.rotateX(-Math.PI / 2);
+    meadowSouthMesh = new THREE.Mesh(southGeo, grassMat);
+    meadowSouthMesh.position.y = -0.30;
+    meadowSouthMesh.receiveShadow = true;
+    terrainGroup.add(meadowSouthMesh);
+
+    // 3. Riverbed liner, sandy pebble banks & translucent flowing water ribbon
+    const bedPositions = [];
+    const bedIndices = [];
+    const waterPositions = [];
+    const waterUVs = [];
+    const waterIndices = [];
+
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const wx = -ISLAND_HALF + t * (ISLAND_HALF * 2);
+      const cz = riverCenterZ(wx);
+      const hw = riverHalfWidth(wx) + 0.12;
+
+      bedPositions.push(wx, -0.25, cz - hw, wx, -0.25, cz + hw);
+      waterPositions.push(wx, -0.07, cz - hw, wx, -0.07, cz + hw);
+      waterUVs.push(t * 2, 0, t * 2, 1);
+
+      if (i < N) {
+        const a = i * 2;
+        const b = a + 1;
+        const c = a + 2;
+        const d = a + 3;
+        bedIndices.push(a, b, c, b, d, c);
+        waterIndices.push(a, b, c, b, d, c);
+      }
+    }
+
+    const bedGeo = new THREE.BufferGeometry();
+    bedGeo.setAttribute('position', new THREE.Float32BufferAttribute(bedPositions, 3));
+    bedGeo.setIndex(bedIndices);
+    bedGeo.computeVertexNormals();
+    const bedMesh = new THREE.Mesh(
+      bedGeo,
+      new THREE.MeshStandardMaterial({ color: 0x3D6E7E, roughness: 0.9 })
+    );
+    bedMesh.receiveShadow = true;
+    terrainGroup.add(bedMesh);
+
+    const waterGeo = new THREE.BufferGeometry();
+    waterGeo.setAttribute('position', new THREE.Float32BufferAttribute(waterPositions, 3));
+    waterGeo.setAttribute('uv', new THREE.Float32BufferAttribute(waterUVs, 2));
+    waterGeo.setIndex(waterIndices);
+    waterGeo.computeVertexNormals();
+
+    riverWaterTex = window.VillageTextures.getWaterTexture(sPal.water, sPal.waterLight);
+    riverWaterMat = new THREE.MeshStandardMaterial({
+      map: riverWaterTex,
+      transparent: true,
+      opacity: 0.78,
+      roughness: 0.18,
+      metalness: 0.08
+    });
+    const waterMesh = new THREE.Mesh(waterGeo, riverWaterMat);
+    waterMesh.receiveShadow = true;
+    terrainGroup.add(waterMesh);
+
+    // Riverbank smooth pebbles & reeds
+    const pebbleMat = new THREE.MeshStandardMaterial({ color: 0xBFB4A2, roughness: 0.92 });
+    const reedMat = new THREE.MeshStandardMaterial({ color: 0x5E8A58, roughness: 0.9 });
+    for (let i = 0; i < 28; i++) {
+      const wx = -ISLAND_HALF + 0.8 + (i / 28) * (ISLAND_HALF * 2 - 1.6);
+      if (Math.abs(wx) < 0.75) continue; // Leave bridge landing clear
+      const side = i % 2 === 0 ? -1 : 1;
+      const wz = riverCenterZ(wx) + side * (riverHalfWidth(wx) + 0.08);
+      const peb = new THREE.Mesh(new THREE.DodecahedronGeometry(0.11 + (i % 3) * 0.03, 0), pebbleMat);
+      peb.scale.set(1.2, 0.55, 1.0);
+      peb.position.set(wx, -0.02, wz);
+      peb.receiveShadow = true;
+      terrainGroup.add(peb);
+
+      if (i % 3 === 0) {
+        for (let r = 0; r < 3; r++) {
+          const reed = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.35 + r * 0.08, 4), reedMat);
+          reed.position.set(wx + r * 0.05, 0.06, wz + side * 0.08);
+          reed.rotation.z = (r - 1) * 0.12;
+          terrainGroup.add(reed);
+        }
+      }
+    }
+
+    // 4. Mini Waterfall pouring off the East cliff
+    const wfZ = riverCenterZ(ISLAND_HALF);
+    waterfallTex = window.VillageTextures.getWaterTexture(sPal.water, sPal.waterLight).clone();
+    waterfallTex.needsUpdate = true;
+    waterfallTex.repeat.set(1, 2);
+    const wfMat = new THREE.MeshStandardMaterial({
+      map: waterfallTex,
+      transparent: true,
+      opacity: 0.84,
+      roughness: 0.2,
+      side: THREE.DoubleSide
+    });
+    const wfPlane = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 1.85), wfMat);
+    wfPlane.position.set(ISLAND_HALF + 0.16, -0.95, wfZ);
+    wfPlane.rotation.y = Math.PI / 2;
+    terrainGroup.add(wfPlane);
+
+    waterfallFoamGroup = new THREE.Group();
+    waterfallFoamGroup.position.set(ISLAND_HALF + 0.18, -1.78, wfZ);
+    const foamMat = new THREE.MeshStandardMaterial({ color: 0xF5FCFF, transparent: true, opacity: 0.88 });
+    for (let i = 0; i < 7; i++) {
+      const puff = new THREE.Mesh(new THREE.SphereGeometry(0.16 + (i % 3) * 0.06, 7, 7), foamMat);
+      puff.position.set((Math.random() - 0.5) * 0.25, (i % 2) * 0.08, (i - 3) * 0.18);
+      waterfallFoamGroup.add(puff);
+    }
+    terrainGroup.add(waterfallFoamGroup);
+
+    // 5. Mossy cliff boulders peeking out of the diorama sides
+    const cliffRockPositions = [
+      [-6.5, -0.8, ISLAND_HALF + 0.12],
+      [4.5, -0.7, ISLAND_HALF + 0.12],
+      [-ISLAND_HALF - 0.1, -0.85, 1.5],
+      [ISLAND_HALF + 0.1, -0.75, -4.2],
+      [-2.5, -0.9, -ISLAND_HALF - 0.1]
+    ];
+    cliffRockPositions.forEach(([rx, ry, rz], idx) => {
+      const b = window.VillageBuilders.buildMossyBoulder3D(1.25 + (idx % 2) * 0.35);
+      b.position.set(rx, ry, rz);
+      terrainGroup.add(b);
+    });
+
+    // Starter cozy stone stepping path right outside starter cabin (1, 1) -> (0, 1)
+    const slabMat = new THREE.MeshStandardMaterial({
+      map: window.VillageTextures.getMossyStoneTexture('#C7B79F', '#9E9487', 0.65),
+      roughness: 0.92
+    });
+    [[1.0, 1.72], [0.65, 1.78], [0.3, 1.72]].forEach(([sx, sz]) => {
+      const slab = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.05, 7), slabMat);
+      slab.position.set(sx * CELL * 0.65, 0.015, sz * 1.15);
+      slab.receiveShadow = true;
+      terrainGroup.add(slab);
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+     Trees, Wildflowers & Mossy Rocks around the Village
+     ------------------------------------------------------------------------ */
+  function buildPerimeterNature() {
+    const season = (typeof state !== 'undefined' && state.season) || 'spring';
+    const occupied = new Set(MILESTONES.map(m => `${Math.round(m.gx)},${Math.round(m.gy)}`));
+
+    const treeCoords = [
+      [-5.3, 1.8], [-5.4, 4.3], [-4.5, 5.2], [-3.2, 5.3], [1.2, 5.2], [2.8, 5.2], [5.2, 5.2],
+      [5.3, -2.8], [5.3, -5.1], [3.9, -5.2], [-0.9, -5.4], [-5.2, -5.2], [-5.3, -1.6],
+      [3.6, 2.0], [-2.5, 4.7], [-4.2, 1.9], [2.4, -2.5], [-3.5, -2.8], [-5.1, -3.5], [4.6, -4.1]
+    ];
+
+    treeRecords = [];
+    treeCoords.forEach(([gx, gy], idx) => {
+      if (occupied.has(`${Math.round(gx)},${Math.round(gy)}`)) return;
+      const w = gridToWorld(gx, gy);
+      if (isInRiverWorld(w.x, w.z, 0.7)) return;
+      const tree = window.VillageBuilders.buildCozyTree3D(idx + 1, season);
+      tree.position.set(w.x, 0, w.z);
+      const s = 0.88 + (idx % 4) * 0.1;
+      tree.scale.setScalar(s);
+      floraGroup.add(tree);
+      treeRecords.push(tree);
+    });
+
+    // Scatter mossy rocks along natural corners
+    [[-4.6, 4.7], [4.8, 2.1], [-4.8, -4.6], [3.9, -2.3], [1.4, 4.9]].forEach(([gx, gy], idx) => {
+      const w = gridToWorld(gx, gy);
+      const rock = window.VillageBuilders.buildMossyBoulder3D(0.85 + (idx % 2) * 0.3);
+      rock.position.set(w.x, 0, w.z);
+      floraGroup.add(rock);
+    });
+
+    rebuildWildflowers(season);
+  }
+
+  function rebuildWildflowers(season) {
+    flowerRecords.forEach(f => floraGroup.remove(f));
+    flowerRecords = [];
+    const occupied = new Set(MILESTONES.map(m => `${Math.round(m.gx)},${Math.round(m.gy)}`));
+
+    for (let i = 0; i < 36; i++) {
+      const angle = i * 2.39996;
+      const radius = 2.0 + (i / 36) * 7.6;
+      const wx = Math.cos(angle) * radius;
+      const wz = Math.sin(angle) * radius;
+      if (Math.abs(wx) > ISLAND_HALF - 0.8 || Math.abs(wz) > ISLAND_HALF - 0.8) continue;
+      if (isInRiverWorld(wx, wz, 0.45)) continue;
+
+      // Avoid cobblestone roads & milestone centers
+      let nearRoad = false;
+      for (const seg of ROAD_SEGMENTS) {
+        if (wx >= Math.min(seg.x1, seg.x2) - 0.65 && wx <= Math.max(seg.x1, seg.x2) + 0.65 &&
+            wz >= Math.min(seg.z1, seg.z2) - 0.65 && wz <= Math.max(seg.z1, seg.z2) + 0.65) {
+          nearRoad = true;
+          break;
+        }
+      }
+      if (nearRoad) continue;
+      const gx = Math.round(wx / CELL);
+      const gy = Math.round(wz / CELL);
+      if (occupied.has(`${gx},${gy}`)) continue;
+
+      const cluster = window.VillageBuilders.buildWildflowerCluster3D(i, season);
+      cluster.position.set(wx, 0, wz);
+      floraGroup.add(cluster);
+      flowerRecords.push(cluster);
+    }
+  }
+
+  /* ------------------------------------------------------------------------
+     Cobblestone Road Network (Unlocked at mailbox_path 0.5h)
+     ------------------------------------------------------------------------ */
+  function rebuildCobblestoneRoads(unlockedIds) {
+    while (roadGroup.children.length > 0) roadGroup.remove(roadGroup.children[0]);
+    if (!unlockedIds.has('mailbox_path')) return;
+
+    const roadMat = new THREE.MeshStandardMaterial({
+      map: window.VillageTextures.getCobbleRoadTexture(),
+      roughness: 0.94
+    });
+    const stoneMat = new THREE.MeshStandardMaterial({ color: 0xC4B49C, roughness: 0.95 });
+
+    ROAD_SEGMENTS.forEach(seg => {
+      const dx = seg.x2 - seg.x1;
+      const dz = seg.z2 - seg.z1;
+      const len = Math.hypot(dx, dz);
+      const base = new THREE.Mesh(
+        new THREE.BoxGeometry(Math.abs(dx) > 0.1 ? len + seg.width : seg.width, 0.03, Math.abs(dz) > 0.1 ? len + seg.width : seg.width),
+        roadMat
+      );
+      base.position.set((seg.x1 + seg.x2) / 2, 0.015, (seg.z1 + seg.z2) / 2);
+      base.receiveShadow = true;
+      roadGroup.add(base);
+
+      // Individual raised 3D cobblestones along the road edges for extra tactile charm
+      const count = Math.floor(len * 2.2);
+      for (let i = 0; i < count; i++) {
+        const t = i / Math.max(1, count - 1);
+        const px = seg.x1 + dx * t + (Math.sin(i * 7) * 0.22);
+        const pz = seg.z1 + dz * t + (Math.cos(i * 5) * 0.22);
+        const cob = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.035, 6), stoneMat);
+        cob.position.set(px, 0.022, pz);
+        cob.receiveShadow = true;
+        roadGroup.add(cob);
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+     Ambient Life: Fish, Butterflies, Clouds, Stray Dogs, Weather
+     ------------------------------------------------------------------------ */
+  function buildAmbientLife() {
+    // 1. River Fish swimming happily below water surface
+    const fishPalette = [
+      ['#F97316', '#FFFDF5'],
+      ['#EF4444', '#FFFFFF'],
+      ['#FBBF24', '#FFFDF5'],
+      ['#FB923C', '#33271E'],
+      ['#EC4899', '#FAF6EE']
+    ];
+    fishRecords = fishPalette.map(([col, acc], idx) => {
+      const fish = window.VillageBuilders.buildRiverFish3D(col, acc);
+      const x = -7.5 + idx * 3.4;
+      fish.position.set(x, -0.17, riverCenterZ(x));
+      ambientGroup.add(fish);
       return {
-        ...existing,
-        name: state.villagerNames[dv.id] || dv.defaultName,
-        role: dv.role,
-        milestoneName: dv.milestoneName
+        mesh: fish,
+        x,
+        dir: idx % 2 === 0 ? 1 : -1,
+        speed: 0.75 + (idx % 3) * 0.22,
+        phase: idx * 1.4,
+        laneOffset: ((idx % 3) - 1) * 0.22
       };
+    });
+
+    // 2. Fluffy drifting clouds
+    cloudRecords = Array.from({ length: 5 }, (_, i) => {
+      const cloud = window.VillageBuilders.buildCloud3D(0.9 + (i % 3) * 0.22);
+      const x = -14 + i * 7;
+      cloud.position.set(x, 8.2 + (i % 2) * 1.4, -13 + (i % 3) * 4);
+      ambientGroup.add(cloud);
+      return { mesh: cloud, speed: 0.38 + (i % 3) * 0.12 };
+    });
+
+    // 3. Fluttering pastel butterflies
+    const bCols = ['#F472B6', '#FBBF24', '#60A5FA', '#C084FC', '#34D399'];
+    butterflyRecords = Array.from({ length: 12 }, (_, i) => {
+      const b = window.VillageBuilders.buildButterfly3D(bCols[i % bCols.length]);
+      const baseX = (Math.sin(i * 3.1) * 6.5);
+      const baseZ = (Math.cos(i * 2.7) * 6.0);
+      b.position.set(baseX, 0.7 + (i % 3) * 0.25, baseZ);
+      ambientGroup.add(b);
+      return { mesh: b, baseX, baseZ, phase: i * 1.1, speed: 0.7 + (i % 3) * 0.2 };
+    });
+
+    // 4. Night Fireflies Particles
+    const ffCount = 34;
+    const ffPos = new Float32Array(ffCount * 3);
+    for (let i = 0; i < ffCount; i++) {
+      ffPos[i * 3] = (Math.random() - 0.5) * 16;
+      ffPos[i * 3 + 1] = 0.4 + Math.random() * 1.3;
+      ffPos[i * 3 + 2] = (Math.random() - 0.5) * 16;
     }
-    return {
-      id: dv.id,
-      name: state.villagerNames[dv.id] || dv.defaultName,
-      role: dv.role,
-      milestoneName: dv.milestoneName,
-      color: dv.color,
-      gx: dv.homeGx + 0.35,
-      gy: dv.homeGy + 0.65,
-      targetGx: (idx % 5) - 2,
-      targetGy: 1,
-      walkPhase: Math.random() * Math.PI * 2,
-      waitTimer: Math.random() * 2
-    };
-  });
-}
+    const ffGeo = new THREE.BufferGeometry();
+    ffGeo.setAttribute('position', new THREE.BufferAttribute(ffPos, 3));
+    const ffMat = new THREE.PointsMaterial({
+      color: 0xFFE28A,
+      size: 0.18,
+      transparent: true,
+      opacity: 0.85
+    });
+    fireflyPoints = new THREE.Points(ffGeo, ffMat);
+    fireflyPoints.visible = false;
+    ambientGroup.add(fireflyPoints);
 
-function getEffectiveLighting() {
-  if (state.timeOfDayMode !== 'auto') return state.timeOfDayMode;
-  const hour = new Date().getHours();
-  if (hour >= 7 && hour < 17) return 'day';
-  if ((hour >= 17 && hour < 20) || (hour >= 6 && hour < 7)) return 'sunset';
-  return 'night';
-}
+    // 5. Winter Snow & Spring Sakura Petals
+    const wCount = 90;
+    const sPos = new Float32Array(wCount * 3);
+    const pPos = new Float32Array(wCount * 3);
+    for (let i = 0; i < wCount; i++) {
+      sPos[i * 3] = (Math.random() - 0.5) * 22;
+      sPos[i * 3 + 1] = Math.random() * 10;
+      sPos[i * 3 + 2] = (Math.random() - 0.5) * 22;
+      pPos[i * 3] = sPos[i * 3];
+      pPos[i * 3 + 1] = sPos[i * 3 + 1];
+      pPos[i * 3 + 2] = sPos[i * 3 + 2];
+    }
+    const snowGeo = new THREE.BufferGeometry();
+    snowGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
+    snowPoints = new THREE.Points(snowGeo, new THREE.PointsMaterial({ color: 0xFFFFFF, size: 0.14, transparent: true, opacity: 0.88 }));
+    snowPoints.visible = false;
 
-function cycleTimeOfDay() {
-  playCozyTone('click');
-  const order = ['auto', 'day', 'sunset', 'night'];
-  const labels = { auto: 'Luz: Auto', day: 'Luz: Día', sunset: 'Luz: Atardecer', night: 'Luz: Noche' };
-  const next = order[(order.indexOf(state.timeOfDayMode) + 1) % order.length];
-  state.timeOfDayMode = next;
-  saveState();
-  const lbl = document.getElementById('timeOfDayLabel');
-  if (lbl) lbl.textContent = labels[next];
-}
+    const petalGeo = new THREE.BufferGeometry();
+    petalGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+    petalPoints = new THREE.Points(petalGeo, new THREE.PointsMaterial({ color: 0xF7A8C0, size: 0.16, transparent: true, opacity: 0.85 }));
+    petalPoints.visible = false;
 
-function zoomVillage(delta) {
-  camera.zoom = Math.min(2.2, Math.max(0.55, camera.zoom + delta));
-}
-
-function resetCamera() {
-  camera.x = 0;
-  camera.y = 20;
-  camera.zoom = window.innerWidth < 640 ? 0.78 : 1.0;
-}
-
-function toggleFullscreenVillage() {
-  const wrap = document.getElementById('villageCanvasWrapper');
-  wrap.classList.toggle('fullscreen-village');
-  resizeCanvas();
-}
-
-function resizeCanvas() {
-  const wrap = document.getElementById('villageCanvasWrapper');
-  if (!wrap || !canvas) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const w = wrap.clientWidth;
-  const h = wrap.clientHeight;
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-
-let lastFrameTime = performance.now();
-function villageLoop(now) {
-  const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
-  lastFrameTime = now;
-
-  updateVillageSimulation(dt, now);
-  renderVillageScene(now);
-  requestAnimationFrame(villageLoop);
-}
-
-function updateVillageSimulation(dt, now) {
-  clouds.forEach(c => {
-    c.x += c.speed * dt;
-    if (c.x > 850) c.x = -850;
-  });
-
-  const unlocked = getUnlockedMilestones();
-  const hasStation = unlocked.some(m => m.id === 'train_station');
-  if (hasStation) {
-    trainProgress += dt * 0.085;
-    if (trainProgress > 1.6) trainProgress = -0.4;
+    ambientGroup.add(snowPoints, petalPoints);
   }
 
-  // Perritos callejeros con comportamiento cozy
-  streetDogs.forEach(dog => {
-    dog.tailWag += dt * 14;
-    dog.stateTimer -= dt;
-    if (dog.stateTimer <= 0) {
-      if (dog.state === 'stroll') {
-        dog.state = Math.random() < 0.5 ? 'sit' : 'sniff';
-        dog.stateTimer = 2.5 + Math.random() * 4;
+  /* ------------------------------------------------------------------------
+     Tagging Interactive Subtrees for Raycaster
+     ------------------------------------------------------------------------ */
+  function tagInteractive(group, kind, data) {
+    group.userData.kind = kind;
+    group.userData.entityData = data;
+    group.userData.baseScale = group.scale.x;
+    group.traverse(child => {
+      if (child.isMesh) {
+        child.userData.interactiveRoot = group;
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+     Reactive Sync with Application State (Buildings, Villagers, Dogs, Decos)
+     ------------------------------------------------------------------------ */
+  function syncSceneFromState() {
+    if (!initialized) return;
+
+    const season = state.season || 'spring';
+    const bPal = ARCHITECTURAL_PALETTES[state.buildingStyle] || ARCHITECTURAL_PALETTES.cottagecore;
+    const sPal = SEASON_PALETTES[season] || SEASON_PALETTES.spring;
+    const unlocked = getUnlockedMilestones();
+    const unlockedIds = new Set(unlocked.map(m => m.id));
+    const unlockedKey = unlocked.map(m => m.id).join(',');
+    const decoKey = JSON.stringify(state.enabledDecorations || {});
+
+    // 1. Season changes -> grass texture, river water tint, trees, wildflowers
+    if (lastSeason !== season) {
+      lastSeason = season;
+      const grassTex = window.VillageTextures.getGrassTexture(season);
+      if (meadowNorthMesh) {
+        meadowNorthMesh.material.map = grassTex;
+        meadowNorthMesh.material.needsUpdate = true;
+      }
+      if (meadowSouthMesh) {
+        meadowSouthMesh.material.map = grassTex;
+        meadowSouthMesh.material.needsUpdate = true;
+      }
+      if (riverWaterMat) {
+        riverWaterMat.map = window.VillageTextures.getWaterTexture(sPal.water, sPal.waterLight);
+        riverWaterMat.needsUpdate = true;
+      }
+      treeRecords.forEach(t => window.VillageBuilders.updateTreeSeason(t, season));
+      rebuildWildflowers(season);
+    }
+
+    // 2. Buildings or Architectural Style changes
+    if (lastUnlockedKey !== unlockedKey || lastStyle !== state.buildingStyle) {
+      const styleChanged = lastStyle !== state.buildingStyle;
+      lastStyle = state.buildingStyle;
+      lastUnlockedKey = unlockedKey;
+
+      rebuildCobblestoneRoads(unlockedIds);
+
+      if (styleChanged) {
+        while (buildingsGroup.children.length > 0) buildingsGroup.remove(buildingsGroup.children[0]);
+        buildingRecords.clear();
       } else {
-        dog.state = 'stroll';
-        dog.stateTimer = 4 + Math.random() * 5;
-        const candidates = Array.from(ROAD_TILES);
-        const pick = candidates[Math.floor(Math.random() * candidates.length)].split(',').map(Number);
-        dog.targetGx = pick[0] + (Math.random() - 0.5) * 0.5;
-        dog.targetGy = pick[1] + (Math.random() - 0.5) * 0.5;
-      }
-    }
-
-    if (dog.state === 'stroll') {
-      const dx = dog.targetGx - dog.gx;
-      const dy = dog.targetGy - dog.gy;
-      const dist = Math.hypot(dx, dy);
-      if (dist > 0.05) {
-        const speed = 0.42;
-        dog.gx += (dx / dist) * speed * dt;
-        dog.gy += (dy / dist) * speed * dt;
-      }
-    }
-  });
-
-  // Aldeanos
-  activeVillagers.forEach(v => {
-    if (v.waitTimer > 0) {
-      v.waitTimer -= dt;
-      return;
-    }
-    const dx = v.targetGx - v.gx;
-    const dy = v.targetGy - v.gy;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 0.08) {
-      v.waitTimer = 1.5 + Math.random() * 3;
-      const candidates = Array.from(ROAD_TILES);
-      const pick = candidates[Math.floor(Math.random() * candidates.length)].split(',').map(Number);
-      v.targetGx = pick[0] + (Math.random() - 0.5) * 0.4;
-      v.targetGy = pick[1] + (Math.random() - 0.5) * 0.4;
-    } else {
-      const speed = 0.48;
-      v.gx += (dx / dist) * speed * dt;
-      v.gy += (dy / dist) * speed * dt;
-      v.walkPhase += dt * 8.5;
-    }
-  });
-
-  // Humo suave de chimeneas
-  if (Math.random() < dt * 6) {
-    const chimneys = unlocked.filter(m => ['cabin', 'cottage', 'cafe', 'bakery', 'library', 'hospital'].includes(m.type));
-    if (chimneys.length > 0) {
-      const b = chimneys[Math.floor(Math.random() * chimneys.length)];
-      const pos = isoToScreen(b.gx, b.gy);
-      smokeParticles.push({
-        x: pos.x + 12,
-        y: pos.y - 48,
-        vx: 4 + Math.random() * 4,
-        vy: -14 - Math.random() * 7,
-        r: 3.5 + Math.random() * 2,
-        alpha: 0.6
-      });
-    }
-  }
-  smokeParticles.forEach(p => {
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
-    p.r += dt * 3.2;
-    p.alpha -= dt * 0.22;
-  });
-  smokeParticles = smokeParticles.filter(p => p.alpha > 0);
-
-  // Clima
-  snowFlakes.forEach(s => {
-    s.y += s.speedY * dt;
-    s.x += Math.sin(now * 0.001 + s.drift) * 12 * dt;
-    if (s.y > 460) s.y = -460;
-  });
-  petals.forEach(p => {
-    p.y += p.speedY * dt;
-    p.x += Math.cos(now * 0.0015 + p.phase) * 18 * dt;
-    if (p.y > 460) p.y = -460;
-  });
-}
-
-/* ==========================================================================
-   RENDERIZADO DE LA ESCENA
-   ========================================================================== */
-function renderVillageScene(now) {
-  const wrap = document.getElementById('villageCanvasWrapper');
-  if (!wrap || !ctx) return;
-  const W = wrap.clientWidth;
-  const H = wrap.clientHeight;
-  if (W === 0 || H === 0) return;
-
-  const sPal = SEASON_PALETTES[state.season] || SEASON_PALETTES.spring;
-  const bPal = ARCHITECTURAL_PALETTES[state.buildingStyle] || ARCHITECTURAL_PALETTES.cottagecore;
-  const lighting = getEffectiveLighting();
-  const unlocked = getUnlockedMilestones();
-  const unlockedIds = new Set(unlocked.map(m => m.id));
-
-  // 1. Cielo relajante con gradiente y estrellas
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
-  if (lighting === 'night') {
-    skyGrad.addColorStop(0, '#131b2e');
-    skyGrad.addColorStop(0.6, '#222f49');
-    skyGrad.addColorStop(1, '#344565');
-  } else if (lighting === 'sunset') {
-    skyGrad.addColorStop(0, '#d97768');
-    skyGrad.addColorStop(0.45, '#f59e72');
-    skyGrad.addColorStop(0.8, '#fad495');
-    skyGrad.addColorStop(1, '#faebd7');
-  } else {
-    skyGrad.addColorStop(0, sPal.skyTop);
-    skyGrad.addColorStop(1, sPal.skyBottom);
-  }
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, W, H);
-
-  if (lighting === 'night') {
-    ctx.fillStyle = '#FFF8E7';
-    for (let i = 0; i < 50; i++) {
-      const sx = ((i * 187) % W);
-      const sy = ((i * 97) % (H * 0.5));
-      const twinkle = 0.35 + 0.65 * Math.sin(now * 0.003 + i);
-      ctx.globalAlpha = twinkle;
-      ctx.beginPath();
-      ctx.arc(sx, sy, (i % 3 === 0 ? 1.6 : 1), 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  // Cámara con zoom & pan
-  ctx.save();
-  ctx.translate(W / 2 + camera.x, H / 2 + camera.y);
-  ctx.scale(camera.zoom, camera.zoom);
-
-  // Nubes suaves
-  clouds.forEach(c => drawCozyCloud(ctx, c.x, c.y, c.scale, lighting));
-
-  // 2. Isla flotante: Base de roca natural con capas geológicas y musgo
-  drawNaturalIslandBase(ctx, sPal, lighting);
-
-  // 3. Suelo orgánico: Césped variado sin cuadrícula dura
-  drawOrganicTerrain(ctx, sPal, now);
-
-  // 4. Sendero de adoquines orgánicos y puentes
-  if (unlockedIds.has('mailbox_path')) {
-    drawNaturalCobblestonePaths(ctx);
-  }
-
-  // 5. Río natural fluido con orillas de arena/piedra y cascada
-  drawNaturalCurvedRiver(ctx, sPal, now);
-
-  // Vías de tren
-  if (unlockedIds.has('train_station')) {
-    drawRailroadTracks(ctx, now, trainProgress);
-  }
-
-  // 6. Entidades ordenadas por profundidad (Z-order)
-  const renderQueue = [];
-
-  // Árboles con frondosidad natural y sombras
-  const occupiedSpots = new Set(MILESTONES.map(m => `${m.gx},${m.gy}`));
-  const forestTrees = [
-    [-5, 2], [-5, 4], [-4, 5], [-3, 5], [1, 5], [3, 5], [5, 5],
-    [5, -3], [5, -5], [4, -5], [-1, -5], [-5, -5], [-5, 0], [3, 3], [-2, 4],
-    [-4, 2], [2, 3], [-3, -4]
-  ];
-  forestTrees.forEach(([tx, ty], idx) => {
-    if (!occupiedSpots.has(`${tx},${ty}`) && !isRiverTile(tx, ty)) {
-      renderQueue.push({
-        depth: tx + ty,
-        draw: () => {
-          const p = isoToScreen(tx, ty);
-          drawStardewTree(ctx, p.x, p.y, idx, sPal, lighting, now);
-        }
-      });
-    }
-  });
-
-  // Patitos en el río
-  if (unlockedIds.has('bridge_pond') && state.enabledDecorations.deco_ducks) {
-    renderQueue.push({
-      depth: 1 + 3 + 0.2,
-      draw: () => {
-        const p = isoToScreen(1.3 + Math.sin(now * 0.001) * 0.4, 3.1);
-        drawCozyDuck(ctx, p.x, p.y, now);
-      }
-    });
-  }
-
-  // Farolas de forja
-  if (unlockedIds.has('mailbox_path') && state.enabledDecorations.deco_lanterns) {
-    const lanternSpots = [[-1, 1], [1, 1], [0, -1], [-2, 1], [2, 1]];
-    lanternSpots.forEach(([lx, ly]) => {
-      renderQueue.push({
-        depth: lx + ly + 0.35,
-        draw: () => {
-          const p = isoToScreen(lx, ly);
-          drawStreetLantern(ctx, p.x - 16, p.y + 4, lighting);
-        }
-      });
-    });
-  }
-
-  // Edificios detallados estilo Stardew / Animal Crossing
-  hitboxes = [];
-  unlocked.forEach(m => {
-    renderQueue.push({
-      depth: m.gx + m.gy + 0.1,
-      draw: () => {
-        const p = isoToScreen(m.gx, m.gy);
-        let scaleY = 1;
-        let isConstructing = false;
-        if (constructionAnimations[m.id]) {
-          const elapsed = (now - constructionAnimations[m.id]) / 1000;
-          if (elapsed < 1.6) {
-            isConstructing = true;
-            scaleY = Math.min(1, elapsed / 0.7) + Math.sin(elapsed * 12) * 0.06 * Math.max(0, 1 - elapsed / 1.6);
-          } else {
-            delete constructionAnimations[m.id];
+        for (const [id, rec] of buildingRecords.entries()) {
+          if (!unlockedIds.has(id)) {
+            buildingsGroup.remove(rec.group);
+            buildingRecords.delete(id);
           }
         }
-
-        drawDetailedBuilding(ctx, p.x, p.y, m.type, scaleY, now, bPal, sPal, lighting);
-
-        if (isConstructing) {
-          drawConstructionSparkles(ctx, p.x, p.y - 25, now);
-        }
-
-        const screenCenter = worldToScreen(p.x, p.y - 24);
-        hitboxes.push({
-          kind: 'building',
-          data: m,
-          sx: screenCenter.x,
-          sy: screenCenter.y,
-          radius: 38 * camera.zoom
-        });
       }
-    });
-  });
 
-  // Perritos callejeros con animaciones y colita
-  if (state.enabledDecorations.deco_dogs && unlockedIds.has('cottage_1')) {
-    streetDogs.forEach(dog => {
-      renderQueue.push({
-        depth: dog.gx + dog.gy + 0.14,
-        draw: () => {
-          const p = isoToScreen(dog.gx, dog.gy);
-          drawCozyStreetDog(ctx, p.x, p.y, dog, now);
-          const sc = worldToScreen(p.x, p.y - 10);
-          hitboxes.push({
-            kind: 'dog',
-            data: dog,
-            sx: sc.x,
-            sy: sc.y,
-            radius: 20 * camera.zoom
-          });
+      unlocked.forEach(m => {
+        if (!buildingRecords.has(m.id)) {
+          const bGroup = window.VillageBuilders.buildBuilding3D(m.type, bPal, sPal);
+          const pos = gridToWorld(m.gx, m.gy);
+          bGroup.position.set(pos.x, m.type === 'bridge' ? 0.0 : 0, pos.z);
+          if (m.type === 'bridge') {
+            bGroup.position.z = riverCenterZ(pos.x);
+          }
+          tagInteractive(bGroup, 'building', m);
+          buildingsGroup.add(bGroup);
+          buildingRecords.set(m.id, { group: bGroup, milestone: m, bounceT: 0 });
         }
+      });
+    }
+
+    // 3. Decorations & Fauna
+    if (lastDecoKey !== decoKey || unlockedKey !== decorationsGroup.userData.lastUnlockedKey) {
+      lastDecoKey = decoKey;
+      decorationsGroup.userData.lastUnlockedKey = unlockedKey;
+      rebuildDecorationsAndDogs(unlockedIds);
+    }
+
+    // 4. Villagers
+    const villagerKey = activeVillagers.map(v => `${v.id}:${v.name}`).join('|');
+    if (lastVillagerKey !== villagerKey) {
+      lastVillagerKey = villagerKey;
+      syncVillagerMeshes();
+    }
+  }
+
+  function rebuildDecorationsAndDogs(unlockedIds) {
+    while (decorationsGroup.children.length > 0) decorationsGroup.remove(decorationsGroup.children[0]);
+    while (dogsGroup.children.length > 0) dogsGroup.remove(dogsGroup.children[0]);
+    lanternRecords = [];
+    duckRecords = [];
+    balloonRecords = [];
+    dogRecords = [];
+    trainObj = null;
+
+    const decos = state.enabledDecorations || {};
+
+    // Street Lanterns
+    if (unlockedIds.has('mailbox_path') && decos.deco_lanterns) {
+      [[-1, 1.3], [1, 1.3], [0.45, -0.55], [-2, 0.45], [2, 0.45]].forEach(([gx, gy]) => {
+        const l = window.VillageBuilders.buildStreetLantern3D();
+        const w = gridToWorld(gx, gy);
+        l.position.set(w.x, 0, w.z);
+        decorationsGroup.add(l);
+        lanternRecords.push(l);
+      });
+    }
+
+    // Sleeping Cat near cafe
+    if (unlockedIds.has('cafe') && decos.deco_cats) {
+      const cat = window.VillageBuilders.buildSleepingCat3D('#D9822B');
+      const w = gridToWorld(1.55, -0.6);
+      cat.position.set(w.x, 0, w.z);
+      decorationsGroup.add(cat);
+    }
+
+    // Family of Ducks in River
+    if (unlockedIds.has('bridge_pond') && decos.deco_ducks) {
+      [1.0, 0.65, 0.6].forEach((sc, idx) => {
+        const duck = window.VillageBuilders.buildDuck3D(sc);
+        const startX = -2.2 - idx * 0.45;
+        duck.position.set(startX, -0.05, riverCenterZ(startX) + (idx === 0 ? 0 : 0.15));
+        decorationsGroup.add(duck);
+        duckRecords.push({ mesh: duck, offset: idx * 0.48 });
+      });
+    }
+
+    // Bunting Garlands in Town Square
+    if (unlockedIds.has('town_square') && decos.deco_bunting) {
+      const bunting = window.VillageBuilders.buildBuntingGarland3D();
+      const w = gridToWorld(1, -2);
+      bunting.position.set(w.x, 1.25, w.z);
+      decorationsGroup.add(bunting);
+    }
+
+    // Hot Air Balloons
+    if (decos.deco_balloons && getDisplayedHours() >= 60) {
+      const b1 = window.VillageBuilders.buildHotAirBalloon3D('#E2B4BD', '#FAF6EE');
+      b1.position.set(-5.5, 6.2, -5.0);
+      decorationsGroup.add(b1);
+      balloonRecords.push({ mesh: b1, baseX: -5.5, baseY: 6.2, baseZ: -5.0, phase: 0 });
+      if (getDisplayedHours() >= 200) {
+        const b2 = window.VillageBuilders.buildHotAirBalloon3D('#A8C8D8', '#E8C07D');
+        b2.position.set(5.5, 7.0, -4.5);
+        decorationsGroup.add(b2);
+        balloonRecords.push({ mesh: b2, baseX: 5.5, baseY: 7.0, baseZ: -4.5, phase: 2.1 });
+      }
+    }
+
+    // Railroad tracks & Pastel Steam Train along East perimeter
+    if (unlockedIds.has('train_station')) {
+      const railMat = new THREE.MeshStandardMaterial({ color: 0x5C3E2B });
+      const r1 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 17.5), railMat);
+      r1.position.set(5.65 * CELL, 0.02, -0.4);
+      const r2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 17.5), railMat);
+      r2.position.set(5.9 * CELL, 0.02, -0.4);
+      decorationsGroup.add(r1, r2);
+
+      trainObj = window.VillageBuilders.buildSteamTrain3D();
+      trainObj.position.set(5.77 * CELL, 0.02, -8);
+      decorationsGroup.add(trainObj);
+    }
+
+    // Stray Dogs: Caramelo is always welcoming from 0h if deco_dogs is enabled; Pipa & Mochi join at 2h+
+    if (decos.deco_dogs !== false) {
+      const hours = getDisplayedHours();
+      STREET_DOG_DEFS.forEach((def, idx) => {
+        if (!def.alwaysAvailable && hours < 2 && !unlockedIds.has('bridge_pond')) return;
+        const dogMesh = window.VillageBuilders.buildStrayDog3D(def);
+        dogMesh.position.set(def.x, 0, def.z);
+        tagInteractive(dogMesh, 'dog', def);
+        dogsGroup.add(dogMesh);
+        dogRecords.push({
+          mesh: dogMesh,
+          data: def,
+          x: def.x,
+          z: def.z,
+          targetX: def.x + 1.2,
+          targetZ: def.z,
+          state: idx === 1 ? 'sit' : 'stroll',
+          stateTimer: 2 + idx * 1.5,
+          tailPhase: idx * 1.8,
+          walkPhase: 0,
+          bounceT: 0
+        });
+      });
+    }
+  }
+
+  function syncVillagerMeshes() {
+    const desiredIds = new Set(activeVillagers.map(v => v.id));
+    for (const [id, rec] of villagerRecords.entries()) {
+      if (!desiredIds.has(id)) {
+        villagersGroup.remove(rec.group);
+        villagerRecords.delete(id);
+      }
+    }
+
+    activeVillagers.forEach(v => {
+      const existing = villagerRecords.get(v.id);
+      if (existing) {
+        existing.data = v;
+        existing.group.userData.entityData = v;
+        return;
+      }
+      const vMesh = window.VillageBuilders.buildVillager3D(v);
+      const w = gridToWorld(v.gx || 0, v.gy || 0.8);
+      vMesh.position.set(w.x, 0, w.z);
+      tagInteractive(vMesh, 'villager', v);
+      villagersGroup.add(vMesh);
+      villagerRecords.set(v.id, {
+        group: vMesh,
+        data: v,
+        x: w.x,
+        z: w.z,
+        targetX: w.x + 1.5,
+        targetZ: w.z,
+        waitTimer: Math.random() * 2,
+        walkPhase: Math.random() * 6,
+        bounceT: 0
       });
     });
   }
 
-  // Gatitos durmiendo
-  if (unlockedIds.has('cafe') && state.enabledDecorations.deco_cats) {
-    renderQueue.push({
-      depth: 2.3,
-      draw: () => {
-        const p = isoToScreen(1, -1);
-        drawCozySleepingCat(ctx, p.x + 22, p.y + 12, '#D9822B', now);
-      }
-    });
-  }
+  /* ------------------------------------------------------------------------
+     Day / Sunset / Night Atmosphere & Lighting
+     ------------------------------------------------------------------------ */
+  function updateAtmosphere(now) {
+    const lighting = getEffectiveLighting();
+    const season = state.season || 'spring';
+    const sPal = SEASON_PALETTES[season] || SEASON_PALETTES.spring;
+    const isNight = lighting === 'night';
+    const isSunset = lighting === 'sunset';
 
-  // Aldeanos
-  activeVillagers.forEach(v => {
-    renderQueue.push({
-      depth: v.gx + v.gy + 0.15,
-      draw: () => {
-        const p = isoToScreen(v.gx, v.gy);
-        drawCozyVillager(ctx, p.x, p.y, v, lighting);
-        const sc = worldToScreen(p.x, p.y - 16);
-        hitboxes.push({
-          kind: 'villager',
-          data: v,
-          sx: sc.x,
-          sy: sc.y,
-          radius: 20 * camera.zoom
-        });
-      }
-    });
-  });
-
-  // Renderizar de atrás hacia adelante
-  renderQueue.sort((a, b) => a.depth - b.depth);
-  renderQueue.forEach(item => item.draw());
-
-  // Humo de chimeneas
-  smokeParticles.forEach(p => {
-    ctx.fillStyle = `rgba(255, 252, 245, ${Math.max(0, p.alpha)})`;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  // Mariposas revoloteando
-  if (state.season === 'spring' || state.season === 'summer') {
-    butterflies.forEach((b, i) => {
-      const bx = b.gx + Math.sin(now * 0.0012 + b.phase) * 0.7;
-      const by = b.gy + Math.cos(now * 0.0015 + b.phase) * 0.7;
-      const p = isoToScreen(bx, by);
-      const wing = Math.abs(Math.sin(now * 0.016 + i)) * 4.8;
-      ctx.fillStyle = b.color;
-      ctx.beginPath();
-      ctx.ellipse(p.x - 2, p.y - 20, wing, 2.6, -0.3, 0, Math.PI * 2);
-      ctx.ellipse(p.x + 2, p.y - 20, wing, 2.6, 0.3, 0, Math.PI * 2);
-      ctx.fill();
-    });
-  }
-
-  // Luciérnagas doradas nocturnas
-  if (lighting === 'night' && state.enabledDecorations.deco_fireflies && getDisplayedHours() >= 28) {
-    fireflies.forEach((f, i) => {
-      const p = isoToScreen(f.gx + Math.sin(now * 0.0008 + f.phase) * 0.5, f.gy);
-      const glow = 0.35 + 0.65 * Math.sin(now * 0.004 + i);
-      ctx.fillStyle = `rgba(255, 224, 130, ${glow})`;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y - 15, 3, 0, Math.PI * 2);
-      ctx.fill();
-    });
-  }
-
-  // Globos aerostáticos
-  if (state.enabledDecorations.deco_balloons && getDisplayedHours() >= 60) {
-    drawHotAirBalloon(ctx, -260 + Math.sin(now * 0.0003) * 45, -240 + Math.cos(now * 0.0005) * 12, '#F472B6', '#FFFDF5');
-    if (getDisplayedHours() >= 200) {
-      drawHotAirBalloon(ctx, 290 + Math.cos(now * 0.00025) * 50, -210 + Math.sin(now * 0.0004) * 15, '#7EA8BE', '#D4A359');
+    if (isNight) {
+      skyCanvasMesh.material.color.setHex(0x1B263B);
+      scene.fog.color.setHex(0x1B263B);
+      hemiLight.color.setHex(0x6D88B0);
+      hemiLight.groundColor.setHex(0x28303E);
+      hemiLight.intensity = 0.55;
+      sunLight.color.setHex(0xA6C4EE);
+      sunLight.intensity = 0.45;
+      fillLight.intensity = 0.25;
+      starField.material.opacity = 0.78 + 0.18 * Math.sin(now * 0.002);
+    } else if (isSunset) {
+      skyCanvasMesh.material.color.setHex(0xF3B796);
+      scene.fog.color.setHex(0xF3B796);
+      hemiLight.color.setHex(0xFFD6BA);
+      hemiLight.groundColor.setHex(0x8E7A6E);
+      hemiLight.intensity = 0.72;
+      sunLight.color.setHex(0xFFAE70);
+      sunLight.intensity = 1.05;
+      fillLight.intensity = 0.3;
+      starField.material.opacity = 0;
+    } else {
+      skyCanvasMesh.material.color.set(sPal.skyTop);
+      scene.fog.color.set(sPal.skyBottom);
+      hemiLight.color.setHex(0xFFF8EC);
+      hemiLight.groundColor.setHex(0x8BA88E);
+      hemiLight.intensity = 0.8;
+      sunLight.color.setHex(0xFFF1D6);
+      sunLight.intensity = 1.05;
+      fillLight.intensity = 0.34;
+      starField.material.opacity = 0;
     }
+
+    // Warm windows & street lanterns
+    const winEmissive = isNight ? 1.15 : (isSunset ? 0.65 : 0.06);
+    for (const rec of buildingRecords.values()) {
+      (rec.group.userData.windowMats || []).forEach(mat => {
+        mat.emissiveIntensity = winEmissive;
+      });
+    }
+
+    const lanternLit = isNight || isSunset;
+    lanternRecords.forEach(l => {
+      if (l.userData.bulbMat) {
+        l.userData.bulbMat.emissiveIntensity = lanternLit ? 1.4 : 0.15;
+      }
+      if (l.userData.haloMesh) {
+        l.userData.haloMesh.material.opacity = lanternLit ? 0.28 : 0;
+      }
+    });
+
+    if (fireflyPoints) {
+      fireflyPoints.visible = isNight && !!(state.enabledDecorations && state.enabledDecorations.deco_fireflies) && getDisplayedHours() >= 28;
+    }
+    if (snowPoints) snowPoints.visible = season === 'winter';
+    if (petalPoints) petalPoints.visible = season === 'spring';
   }
 
-  // Nieve o pétalos de cerezo
-  if (state.season === 'winter') {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
-    snowFlakes.forEach(s => {
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fill();
+  /* ------------------------------------------------------------------------
+     Per-Frame Simulation & Animation
+     ------------------------------------------------------------------------ */
+  function updateSimulation(dt, now) {
+    // 1. Animated river surface & waterfall
+    if (riverWaterTex) {
+      riverWaterTex.offset.x -= dt * 0.22;
+    }
+    if (waterfallTex) {
+      waterfallTex.offset.y += dt * 0.85;
+    }
+    if (waterfallFoamGroup) {
+      waterfallFoamGroup.children.forEach((p, idx) => {
+        p.position.y = ((idx % 2) * 0.06) + Math.sin(now * 0.008 + idx) * 0.06;
+        const s = 0.85 + Math.sin(now * 0.006 + idx * 2) * 0.18;
+        p.scale.setScalar(s);
+      });
+    }
+
+    // 2. Gentle sway for trees & wildflowers
+    treeRecords.forEach(t => {
+      if (t.userData.canopyGroup) {
+        t.userData.canopyGroup.rotation.z = Math.sin(now * 0.0016 + t.userData.swayPhase) * 0.03;
+      }
     });
-  } else if (state.season === 'spring') {
-    ctx.fillStyle = 'rgba(244, 114, 182, 0.75)';
-    petals.forEach(p => {
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y, 3.4, 1.8, p.phase, 0, Math.PI * 2);
-      ctx.fill();
+    flowerRecords.forEach(f => {
+      f.rotation.z = Math.sin(now * 0.0022 + f.userData.swayPhase) * 0.06;
     });
-  }
 
-  ctx.restore();
-}
+    // 3. Swimming River Fish
+    fishRecords.forEach(f => {
+      f.x += f.dir * f.speed * dt;
+      if (f.x > 8.6) f.dir = -1;
+      if (f.x < -8.6) f.dir = 1;
+      const cz = riverCenterZ(f.x) + f.laneOffset + Math.sin(now * 0.003 + f.phase) * 0.12;
+      f.mesh.position.set(f.x, -0.17, cz);
+      f.mesh.rotation.y = f.dir > 0 ? 0 : Math.PI;
+      if (f.mesh.userData.tailMesh) {
+        f.mesh.userData.tailMesh.rotation.y = Math.sin(now * 0.015 + f.phase) * 0.45;
+      }
+    });
 
-/* ==========================================================================
-   DIBUJO DE TERRENO Y PAISAJE NATURAL (ADIÓS TABLERO DE AJEDREZ)
-   ========================================================================== */
+    // 4. Ducks swimming gently
+    duckRecords.forEach((d, idx) => {
+      const dx = -2.2 + Math.sin(now * 0.00055 + idx * 0.18) * 3.2 - d.offset * Math.cos(now * 0.00055);
+      d.mesh.position.set(dx, -0.05 + Math.sin(now * 0.004 + idx) * 0.015, riverCenterZ(dx) + (idx === 0 ? 0 : 0.14));
+      d.mesh.rotation.y = Math.cos(now * 0.00055) >= 0 ? 0 : Math.PI;
+    });
 
-function drawNaturalIslandBase(ctx, sPal, lighting) {
-  const r = GRID_RADIUS + 0.6;
-  const top = isoToScreen(-r, -r);
-  const right = isoToScreen(r, -r);
-  const bottom = isoToScreen(r, r);
-  const left = isoToScreen(-r, r);
-  const depth = 55;
+    // 5. Butterflies fluttering
+    const showButterflies = state.season === 'spring' || state.season === 'summer';
+    butterflyRecords.forEach((b, i) => {
+      b.mesh.visible = showButterflies;
+      if (!showButterflies) return;
+      const bx = b.baseX + Math.sin(now * 0.0011 * b.speed + b.phase) * 1.1;
+      const bz = b.baseZ + Math.cos(now * 0.0013 * b.speed + b.phase) * 1.1;
+      const by = 0.72 + Math.sin(now * 0.0035 + b.phase) * 0.22;
+      b.mesh.position.set(bx, by, bz);
+      b.mesh.rotation.y = Math.atan2(
+        Math.cos(now * 0.0011 * b.speed + b.phase),
+        -Math.sin(now * 0.0013 * b.speed + b.phase)
+      );
+      const flap = Math.sin(now * 0.022 + i) * 0.75;
+      if (b.mesh.userData.leftWing) b.mesh.userData.leftWing.rotation.y = flap;
+      if (b.mesh.userData.rightWing) b.mesh.userData.rightWing.rotation.y = -flap;
+    });
 
-  ctx.fillStyle = lighting === 'night' ? '#2e241c' : '#5c4533';
-  ctx.beginPath();
-  ctx.moveTo(left.x, left.y);
-  ctx.lineTo(bottom.x, bottom.y);
-  ctx.lineTo(bottom.x, bottom.y + depth);
-  ctx.lineTo(left.x, left.y + depth);
-  ctx.closePath();
-  ctx.fill();
+    // 6. Clouds & Balloons
+    cloudRecords.forEach(c => {
+      c.mesh.position.x += c.speed * dt;
+      if (c.mesh.position.x > 19) c.mesh.position.x = -19;
+    });
+    balloonRecords.forEach(b => {
+      b.mesh.position.x = b.baseX + Math.sin(now * 0.0003 + b.phase) * 1.6;
+      b.mesh.position.y = b.baseY + Math.cos(now * 0.0006 + b.phase) * 0.45;
+    });
 
-  ctx.fillStyle = lighting === 'night' ? '#231b14' : '#453325';
-  ctx.beginPath();
-  ctx.moveTo(bottom.x, bottom.y);
-  ctx.lineTo(right.x, right.y);
-  ctx.lineTo(right.x, right.y + depth);
-  ctx.lineTo(bottom.x, bottom.y + depth);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = sPal.grassDark || '#6A945E';
-  ctx.beginPath();
-  ctx.moveTo(left.x, left.y);
-  ctx.lineTo(bottom.x, bottom.y);
-  ctx.lineTo(bottom.x, bottom.y + 8);
-  ctx.lineTo(left.x, left.y + 8);
-  ctx.closePath();
-  ctx.fill();
-}
-
-function drawOrganicTerrain(ctx, sPal, now) {
-  const r = GRID_RADIUS;
-  const top = isoToScreen(-r, -r);
-  const right = isoToScreen(r, -r);
-  const bottom = isoToScreen(r, r);
-  const left = isoToScreen(-r, r);
-
-  const terrainGrad = ctx.createLinearGradient(left.x, left.y, right.x, right.y);
-  terrainGrad.addColorStop(0, sPal.grass);
-  terrainGrad.addColorStop(0.5, sPal.grassLight);
-  terrainGrad.addColorStop(1, sPal.grass);
-
-  ctx.fillStyle = terrainGrad;
-  ctx.beginPath();
-  ctx.moveTo(top.x, top.y);
-  ctx.lineTo(right.x, right.y);
-  ctx.lineTo(bottom.x, bottom.y);
-  ctx.lineTo(left.x, left.y);
-  ctx.closePath();
-  ctx.fill();
-
-  for (let gx = -GRID_RADIUS; gx <= GRID_RADIUS; gx++) {
-    for (let gy = -GRID_RADIUS; gy <= GRID_RADIUS; gy++) {
-      if (isRiverTile(gx, gy) || ROAD_TILES.has(`${gx},${gy}`)) continue;
-
-      const p = isoToScreen(gx, gy);
-      const seed = Math.abs(gx * 73 + gy * 37);
-
-      if (seed % 2 === 0) {
-        ctx.fillStyle = sPal.grassLight;
-        ctx.beginPath();
-        ctx.ellipse(p.x, p.y, 22 + (seed % 10), 11 + (seed % 5), 0, 0, Math.PI * 2);
-        ctx.fill();
+    // 7. Building-specific animations (windmill blades, fountain jet, lighthouse, construction pop-in)
+    for (const [id, rec] of buildingRecords.entries()) {
+      const g = rec.group;
+      if (g.userData.windmillBlades) {
+        g.userData.windmillBlades.rotation.z -= dt * 1.25;
+      }
+      if (g.userData.fountainJet) {
+        g.userData.fountainJet.position.y = 0.68 + Math.sin(now * 0.008) * 0.04;
+      }
+      if (g.userData.lighthouseBeam) {
+        g.userData.lighthouseBeam.rotation.y += dt * 0.9;
       }
 
-      ctx.fillStyle = sPal.grassDark;
-      ctx.fillRect(p.x - 4, p.y - 2, 1.5, 4);
-      ctx.fillRect(p.x - 2, p.y - 3, 1.5, 5);
-      ctx.fillRect(p.x, p.y - 2, 1.5, 4);
-
-      if (seed % 3 === 0) {
-        const flowerCols = sPal.flowers || ['#FFFFFF', '#FFE27A', '#F472B6', '#60A5FA'];
-        const fc = flowerCols[seed % flowerCols.length];
-        ctx.fillStyle = fc;
-        ctx.beginPath();
-        ctx.arc(p.x + 6, p.y - 4, 2.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#F59E0B';
-        ctx.beginPath();
-        ctx.arc(p.x + 6, p.y - 4, 0.8, 0, Math.PI * 2);
-        ctx.fill();
+      // Newly unlocked construction elastic bounce
+      let scaleY = 1;
+      if (constructionAnimations[id]) {
+        const elapsed = (now - constructionAnimations[id]) / 1000;
+        if (elapsed < 1.5) {
+          const t = Math.min(1, elapsed / 0.65);
+          scaleY = t + Math.sin(elapsed * 12) * 0.1 * Math.max(0, 1 - elapsed / 1.5);
+        } else {
+          delete constructionAnimations[id];
+        }
       }
+
+      // Interactive hover / click bounce
+      if (rec.bounceT > 0) {
+        rec.bounceT = Math.max(0, rec.bounceT - dt * 3);
+      }
+      const clickBounce = rec.bounceT > 0 ? Math.sin(rec.bounceT * Math.PI) * 0.12 : 0;
+      const hoverScale = hoveredRoot === g ? 1.04 : 1.0;
+      g.scale.set(hoverScale, hoverScale * scaleY + clickBounce, hoverScale);
     }
-  }
-}
 
-function drawNaturalCobblestonePaths(ctx) {
-  ROAD_TILES.forEach(coord => {
-    const [gx, gy] = coord.split(',').map(Number);
-    if (isRiverTile(gx, gy)) return;
-
-    const p = isoToScreen(gx, gy);
-
-    ctx.fillStyle = '#E2D5BE';
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y, 32, 16, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    const stones = [
-      { ox: -12, oy: -2, rx: 5.5, ry: 3.2, c: '#C4B49C' },
-      { ox: 10, oy: 3, rx: 6, ry: 3.5, c: '#BAA78D' },
-      { ox: -2, oy: 6, rx: 5, ry: 3, c: '#CFC0A8' },
-      { ox: 12, oy: -4, rx: 5, ry: 3.2, c: '#C4B49C' },
-      { ox: -8, oy: 5, rx: 4.8, ry: 3, c: '#B09E85' },
-      { ox: 1, oy: -6, rx: 5.8, ry: 3.4, c: '#D4C6AF' }
-    ];
-
-    stones.forEach(s => {
-      ctx.fillStyle = s.c;
-      ctx.beginPath();
-      ctx.ellipse(p.x + s.ox, p.y + s.oy, s.rx, s.ry, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = 'rgba(92, 62, 43, 0.22)';
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
-    });
-
-    ctx.fillStyle = 'rgba(110, 155, 100, 0.7)';
-    ctx.beginPath();
-    ctx.arc(p.x + 3, p.y + 1, 2, 0, Math.PI * 2);
-    ctx.arc(p.x - 5, p.y - 4, 1.8, 0, Math.PI * 2);
-    ctx.fill();
-  });
-}
-
-function drawNaturalCurvedRiver(ctx, sPal, now) {
-  const pStart = isoToScreen(-3.5, 3);
-  const pMid1 = isoToScreen(0, 3);
-  const pMid2 = isoToScreen(3.5, 3);
-  const pEnd = isoToScreen(5.5, 5);
-
-  ctx.strokeStyle = '#D4C3A3';
-  ctx.lineWidth = 36;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.moveTo(pStart.x, pStart.y);
-  ctx.quadraticCurveTo(pMid1.x, pMid1.y + 10, pMid2.x, pMid2.y);
-  ctx.quadraticCurveTo(pEnd.x - 20, pEnd.y - 15, pEnd.x, pEnd.y);
-  ctx.stroke();
-
-  const waterGrad = ctx.createLinearGradient(pStart.x, pStart.y, pEnd.x, pEnd.y);
-  waterGrad.addColorStop(0, sPal.water);
-  waterGrad.addColorStop(0.5, sPal.waterDeep || '#5AAFCB');
-  waterGrad.addColorStop(1, sPal.water);
-
-  ctx.strokeStyle = waterGrad;
-  ctx.lineWidth = 26;
-  ctx.beginPath();
-  ctx.moveTo(pStart.x, pStart.y);
-  ctx.quadraticCurveTo(pMid1.x, pMid1.y + 10, pMid2.x, pMid2.y);
-  ctx.quadraticCurveTo(pEnd.x - 20, pEnd.y - 15, pEnd.x, pEnd.y);
-  ctx.stroke();
-
-  const rippleOffset = Math.sin(now * 0.003) * 6;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(pMid1.x - 18 + rippleOffset, pMid1.y + 6);
-  ctx.lineTo(pMid1.x + 12 + rippleOffset, pMid1.y + 6);
-  ctx.moveTo(pMid2.x - 14 + rippleOffset, pMid2.y - 2);
-  ctx.lineTo(pMid2.x + 16 + rippleOffset, pMid2.y - 2);
-  ctx.stroke();
-
-  ctx.fillStyle = '#6E8B74';
-  [pMid1, pMid2].forEach(pt => {
-    ctx.fillRect(pt.x - 16, pt.y - 12, 1.8, 8);
-    ctx.fillRect(pt.x - 13, pt.y - 15, 1.8, 10);
-  });
-}
-
-function drawDetailedBuilding(ctx, x, y, type, scaleY, now, bPal, sPal, lighting) {
-  ctx.save();
-  ctx.translate(x, y + 6);
-  ctx.scale(1.0, scaleY);
-
-  const lit = lighting === 'night' || lighting === 'sunset';
-
-  ctx.fillStyle = 'rgba(50, 40, 30, 0.24)';
-  ctx.beginPath();
-  ctx.ellipse(0, 4, 30, 15, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  switch (type) {
-    case 'cabin':
-      drawTimberStoneHouse(ctx, 22, 22, 20, '#A67046', '#855431', bPal.roof, bPal.roofDark, true, lit);
-      drawCozyWindow(ctx, 8, -12, lit);
-      ctx.fillStyle = '#7C5841';
-      ctx.fillRect(-12, 0, 14, 2);
-      break;
-
-    case 'mailbox':
-      ctx.fillStyle = '#8B5A3B';
-      ctx.fillRect(-2, -16, 4, 16);
-      ctx.fillStyle = '#D97768';
-      ctx.beginPath();
-      ctx.roundRect(-7, -22, 12, 8, 3);
-      ctx.fill();
-      drawStreetLantern(ctx, 12, 0, lighting);
-      break;
-
-    case 'cottage':
-      drawTimberStoneHouse(ctx, 24, 24, 22, bPal.stone, bPal.stoneShade, bPal.roofAlt, bPal.roofAltDark, true, lit);
-      ctx.fillStyle = '#6E8B74';
-      ctx.beginPath();
-      ctx.arc(-14, -8, 5, 0, Math.PI * 2);
-      ctx.arc(-10, -14, 4, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-
-    case 'bridge':
-      ctx.fillStyle = '#8B5A3B';
-      ctx.beginPath();
-      ctx.moveTo(-24, -4);
-      ctx.quadraticCurveTo(0, -20, 24, 6);
-      ctx.lineTo(16, 14);
-      ctx.quadraticCurveTo(0, -12, -16, 4);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = '#5C3E2B';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(-24, -10);
-      ctx.quadraticCurveTo(0, -26, 24, 0);
-      ctx.stroke();
-      break;
-
-    case 'cafe':
-      drawTimberStoneHouse(ctx, 26, 26, 24, bPal.plaster, bPal.plasterShade, bPal.roof, bPal.roofDark, true, lit);
-      drawStripedAwning(ctx, -8, -14, 22, '#F472B6', '#FFFDF5');
-      ctx.fillStyle = '#FAF6EE';
-      ctx.beginPath();
-      ctx.ellipse(-18, 6, 7, 3.8, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#8B5A3B';
-      ctx.fillRect(-19, 6, 2, 6);
-      break;
-
-    case 'bakery':
-      drawTimberStoneHouse(ctx, 25, 25, 23, '#F5E7CE', '#DFCCA8', '#D4A359', '#A87C38', true, lit);
-      ctx.fillStyle = '#9E8E82';
-      ctx.beginPath();
-      ctx.arc(20, -6, 9, Math.PI, 0);
-      ctx.fill();
-      break;
-
-    case 'library':
-      drawTimberStoneHouse(ctx, 28, 30, 28, bPal.stone, bPal.stoneShade, '#6E8B74', '#4D6753', true, lit);
-      ctx.fillStyle = bPal.stone;
-      ctx.fillRect(-7, -56, 14, 20);
-      ctx.fillStyle = '#5C3E2B';
-      ctx.beginPath();
-      ctx.moveTo(-9, -56); ctx.lineTo(0, -72); ctx.lineTo(9, -56);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#FFFDF5';
-      ctx.beginPath();
-      ctx.arc(0, -46, 5, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-
-    case 'hospital':
-      drawTimberStoneHouse(ctx, 34, 34, 32, '#FAF7F0', '#E5DFD2', '#6E8B74', '#4D6753', true, lit);
-      ctx.fillStyle = '#C97B63';
-      ctx.fillRect(-5, -40, 10, 3);
-      ctx.fillRect(-1.5, -43.5, 3, 10);
-      break;
-
-    default:
-      drawTimberStoneHouse(ctx, 25, 25, 24, bPal.stone, bPal.stoneShade, bPal.roof, bPal.roofDark, true, lit);
-      break;
-  }
-
-  ctx.restore();
-}
-
-function drawTimberStoneHouse(ctx, w, d, h, wallL, wallR, roofC, roofDark, hasChimney, lit) {
-  ctx.fillStyle = wallL;
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(-w, -w * 0.5);
-  ctx.lineTo(-w, -w * 0.5 - h);
-  ctx.lineTo(0, -h);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.strokeStyle = '#5C3E2B';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(0, 0); ctx.lineTo(-w, -w * 0.5); ctx.lineTo(-w, -w * 0.5 - h); ctx.lineTo(0, -h); ctx.closePath();
-  ctx.stroke();
-
-  ctx.fillStyle = wallR;
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(d, -d * 0.5);
-  ctx.lineTo(d, -d * 0.5 - h);
-  ctx.lineTo(0, -h);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo(0, 0); ctx.lineTo(d, -d * 0.5); ctx.lineTo(d, -d * 0.5 - h); ctx.lineTo(0, -h); ctx.closePath();
-  ctx.stroke();
-
-  const peakH = h + 18;
-  ctx.fillStyle = roofC;
-  ctx.beginPath();
-  ctx.moveTo(0, -h - 2);
-  ctx.lineTo(d + 3, -d * 0.5 - h);
-  ctx.lineTo(d * 0.5, -d * 0.25 - peakH);
-  ctx.lineTo(-w * 0.5, -w * 0.25 - peakH);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = roofDark;
-  ctx.beginPath();
-  ctx.moveTo(-w - 3, -w * 0.5 - h);
-  ctx.lineTo(0, -h - 2);
-  ctx.lineTo(-w * 0.5, -w * 0.25 - peakH);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.strokeStyle = '#4A2E1B';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  if (hasChimney) {
-    ctx.fillStyle = '#8B5E48';
-    ctx.fillRect(5, -peakH - 10, 7, 14);
-    ctx.fillStyle = '#5C3E2B';
-    ctx.fillRect(4, -peakH - 11, 9, 2.5);
-  }
-
-  ctx.fillStyle = '#7C5841';
-  ctx.beginPath();
-  ctx.moveTo(-w * 0.35, -w * 0.175);
-  ctx.lineTo(-w * 0.65, -w * 0.325);
-  ctx.lineTo(-w * 0.65, -w * 0.325 - 14);
-  ctx.lineTo(-w * 0.35, -w * 0.175 - 14);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = '#4A2E1B';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-
-  drawCozyWindow(ctx, d * 0.35, -d * 0.18 - h * 0.5, lit);
-  drawCozyWindow(ctx, d * 0.7, -d * 0.35 - h * 0.5, lit);
-}
-
-function drawCozyWindow(ctx, x, y, lit) {
-  ctx.fillStyle = lit ? '#FFE48F' : '#89B2C4';
-  ctx.fillRect(x, y, 7, 7);
-  ctx.strokeStyle = '#5C3E2B';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x, y, 7, 7);
-  ctx.beginPath();
-  ctx.moveTo(x + 3.5, y); ctx.lineTo(x + 3.5, y + 7);
-  ctx.moveTo(x, y + 3.5); ctx.lineTo(x + 7, y + 3.5);
-  ctx.stroke();
-}
-
-function drawStripedAwning(ctx, x, y, width, colorA, colorB) {
-  ctx.fillStyle = colorA;
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x - 16, y - 8);
-  ctx.lineTo(x - 20, y - 2);
-  ctx.lineTo(x - 4, y + 6);
-  ctx.closePath();
-  ctx.fill();
-}
-
-function drawCozyStreetDog(ctx, x, y, dog, now) {
-  ctx.save();
-  ctx.translate(x, y);
-
-  ctx.fillStyle = 'rgba(50, 40, 30, 0.25)';
-  ctx.beginPath();
-  ctx.ellipse(0, 3, 10, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  const wag = Math.sin(dog.tailWag) * 0.35;
-
-  if (dog.state === 'sit') {
-    ctx.fillStyle = dog.bodyColor;
-    ctx.beginPath();
-    ctx.ellipse(0, -3, 7, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = dog.bellyColor;
-    ctx.beginPath();
-    ctx.ellipse(2, -2, 3.5, 4.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = dog.bodyColor;
-    ctx.beginPath();
-    ctx.arc(4, -9, 5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = dog.earColor;
-    ctx.beginPath();
-    ctx.moveTo(2, -13); ctx.lineTo(4, -17); ctx.lineTo(6, -13);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = dog.bellyColor;
-    ctx.beginPath();
-    ctx.arc(7.5, -8, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#261C14';
-    ctx.beginPath();
-    ctx.arc(9, -8.5, 1.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(5.2, -10.5, 1, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = dog.bodyColor;
-    ctx.lineWidth = 2.6;
-    ctx.beginPath();
-    ctx.moveTo(-5, -2);
-    ctx.lineTo(-10 + wag * 4, -7);
-    ctx.stroke();
-
-  } else {
-    const walkBob = Math.sin(now * 0.012) * 1.5;
-
-    ctx.fillStyle = dog.bodyColor;
-    ctx.beginPath();
-    ctx.ellipse(0, -4 + walkBob, 8, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = dog.earColor;
-    ctx.fillRect(-5, 0, 2.4, 4);
-    ctx.fillRect(3, 0, 2.4, 4);
-
-    const headY = dog.state === 'sniff' ? -4 : -9;
-    ctx.fillStyle = dog.bodyColor;
-    ctx.beginPath();
-    ctx.arc(6, headY + walkBob, 4.8, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = dog.earColor;
-    ctx.beginPath();
-    ctx.ellipse(4, headY - 3 + walkBob, 2.2, 3.8, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#261C14';
-    ctx.beginPath();
-    ctx.arc(9.8, headY + 1 + walkBob, 1.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = dog.bodyColor;
-    ctx.lineWidth = 2.6;
-    ctx.beginPath();
-    ctx.moveTo(-6, -5 + walkBob);
-    ctx.lineTo(-11, -9 + wag * 5 + walkBob);
-    ctx.stroke();
-  }
-
-  if (camera.zoom >= 0.85) {
-    ctx.font = 'bold 9px Quicksand, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#5C3E2B';
-    ctx.fillText(dog.name + ' 🐶', 0, -17);
-  }
-
-  ctx.restore();
-}
-
-function drawStardewTree(ctx, x, y, seed, sPal, lighting, now) {
-  const foliageColor = sPal.foliage ? sPal.foliage[seed % sPal.foliage.length] : '#69A65B';
-  const sway = Math.sin(now * 0.002 + seed) * 1.8;
-
-  ctx.fillStyle = 'rgba(50, 40, 30, 0.22)';
-  ctx.beginPath();
-  ctx.ellipse(x + 3, y + 4, 18, 9, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#6E4730';
-  ctx.fillRect(x - 3.5, y - 18, 7, 20);
-
-  ctx.fillStyle = foliageColor;
-  ctx.beginPath();
-  ctx.arc(x + sway, y - 28, 16, 0, Math.PI * 2);
-  ctx.arc(x - 11 + sway, y - 22, 12, 0, Math.PI * 2);
-  ctx.arc(x + 11 + sway, y - 22, 12, 0, Math.PI * 2);
-  ctx.arc(x + sway, y - 36, 11, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.24)';
-  ctx.beginPath();
-  ctx.arc(x - 4 + sway, y - 32, 8, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawCozyDuck(ctx, x, y, now) {
-  const bob = Math.sin(now * 0.004) * 1.5;
-  ctx.fillStyle = '#FFFDF7';
-  ctx.beginPath();
-  ctx.ellipse(x, y + bob, 7, 4.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(x + 4.5, y - 3.5 + bob, 3.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#E09B46';
-  ctx.beginPath();
-  ctx.moveTo(x + 7, y - 3.5 + bob);
-  ctx.lineTo(x + 10.5, y - 3 + bob);
-  ctx.lineTo(x + 7, y - 2 + bob);
-  ctx.fill();
-}
-
-function drawCozySleepingCat(ctx, x, y, color, now) {
-  const breathe = Math.sin(now * 0.003) * 0.7;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.ellipse(x, y, 7.5, 5 + breathe * 0.4, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(x - 4.5, y - 2, 3.8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(x - 7, y - 4); ctx.lineTo(x - 6, y - 8); ctx.lineTo(x - 4, y - 5);
-  ctx.moveTo(x - 4, y - 5); ctx.lineTo(x - 2, y - 8); ctx.lineTo(x - 1, y - 4);
-  ctx.fill();
-}
-
-function drawCozyVillager(ctx, x, y, villager, lighting) {
-  const bounce = Math.abs(Math.sin(villager.walkPhase)) * 2.8;
-
-  ctx.fillStyle = 'rgba(50, 40, 30, 0.25)';
-  ctx.beginPath();
-  ctx.ellipse(x, y + 2, 7, 3.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = villager.color || '#8FA893';
-  ctx.beginPath();
-  ctx.moveTo(x - 5.5, y - bounce);
-  ctx.lineTo(x + 5.5, y - bounce);
-  ctx.lineTo(x + 4, y - 12 - bounce);
-  ctx.lineTo(x - 4, y - 12 - bounce);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = '#F7D7C4';
-  ctx.beginPath();
-  ctx.arc(x, y - 16 - bounce, 4.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#5C3E2B';
-  ctx.beginPath();
-  ctx.arc(x, y - 17.5 - bounce, 4.6, Math.PI, 0);
-  ctx.fill();
-
-  if (camera.zoom >= 0.85) {
-    ctx.font = 'bold 9.5px Quicksand, sans-serif';
-    ctx.textAlign = 'center';
-    const label = villager.name;
-    const tw = ctx.measureText(label).width + 10;
-    ctx.fillStyle = 'rgba(250, 246, 238, 0.9)';
-    ctx.beginPath();
-    ctx.roundRect(x - tw / 2, y - 33 - bounce, tw, 13, 5);
-    ctx.fill();
-    ctx.fillStyle = '#5C3E2B';
-    ctx.fillText(label, x, y - 23.5 - bounce);
-  }
-}
-
-function drawCozyCloud(ctx, x, y, scale, lighting) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  ctx.fillStyle = lighting === 'night' ? 'rgba(140, 165, 190, 0.18)' : 'rgba(255, 253, 248, 0.85)';
-  ctx.beginPath();
-  ctx.arc(0, 0, 26, 0, Math.PI * 2);
-  ctx.arc(24, -4, 30, 0, Math.PI * 2);
-  ctx.arc(52, 2, 24, 0, Math.PI * 2);
-  ctx.arc(-22, 4, 20, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawStreetLantern(ctx, x, y, lighting) {
-  ctx.fillStyle = '#4A3B32';
-  ctx.fillRect(x - 1.5, y - 22, 3, 22);
-  const isLit = lighting === 'night' || lighting === 'sunset';
-  if (isLit) {
-    const grad = ctx.createRadialGradient(x, y - 24, 2, x, y - 24, 20);
-    grad.addColorStop(0, 'rgba(255, 224, 130, 0.85)');
-    grad.addColorStop(1, 'rgba(255, 224, 130, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(x, y - 24, 20, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.fillStyle = isLit ? '#FFE28A' : '#DCE6EA';
-  ctx.beginPath();
-  ctx.arc(x, y - 24, 4, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawHotAirBalloon(ctx, x, y, colorA, colorB) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.strokeStyle = '#7C5841';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(-7, 16); ctx.lineTo(-4, 26);
-  ctx.moveTo(7, 16); ctx.lineTo(4, 26);
-  ctx.stroke();
-  ctx.fillStyle = '#8B644B';
-  ctx.fillRect(-5, 26, 10, 8);
-  ctx.fillStyle = colorA;
-  ctx.beginPath();
-  ctx.arc(0, 0, 20, Math.PI, 0);
-  ctx.lineTo(8, 17);
-  ctx.lineTo(-8, 17);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = colorB;
-  ctx.beginPath();
-  ctx.ellipse(0, -1, 8, 19, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawRailroadTracks(ctx, now, progress) {
-  const p1 = isoToScreen(5.4, -5.5);
-  const p2 = isoToScreen(5.4, 5.5);
-  ctx.strokeStyle = '#6E5849';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(p1.x - 3, p1.y); ctx.lineTo(p2.x - 3, p2.y);
-  ctx.moveTo(p1.x + 3, p1.y); ctx.lineTo(p2.x + 3, p2.y);
-  ctx.stroke();
-
-  if (progress >= 0 && progress <= 1) {
-    const tx = p1.x + (p2.x - p1.x) * progress;
-    const ty = p1.y + (p2.y - p1.y) * progress;
-    ctx.save();
-    ctx.translate(tx, ty - 6);
-    ctx.fillStyle = '#7EA8BE';
-    ctx.beginPath();
-    ctx.roundRect(-14, -10, 28, 13, 4);
-    ctx.fill();
-    ctx.fillStyle = '#D4A359';
-    ctx.fillRect(-10, -14, 10, 5);
-    ctx.fillStyle = '#FAF6EE';
-    ctx.fillRect(-7, -8, 6, 4);
-    ctx.fillRect(3, -8, 6, 4);
-    ctx.restore();
-  }
-}
-
-function drawConstructionSparkles(ctx, x, y, now) {
-  ctx.save();
-  for (let i = 0; i < 8; i++) {
-    const ang = (i / 8) * Math.PI * 2 + now * 0.004;
-    const dist = 16 + Math.sin(now * 0.01 + i) * 8;
-    ctx.fillStyle = '#E8C07D';
-    ctx.beginPath();
-    ctx.arc(x + Math.cos(ang) * dist, y + Math.sin(ang) * dist, 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-function setupCanvasInteractions() {
-  if (!canvas) return;
-
-  canvas.addEventListener('pointerdown', (e) => {
-    camera.isDragging = true;
-    camera.dragMoved = false;
-    camera.lastMouseX = e.clientX;
-    camera.lastMouseY = e.clientY;
-    canvas.setPointerCapture(e.pointerId);
-  });
-
-  canvas.addEventListener('pointermove', (e) => {
-    if (!camera.isDragging) return;
-    const dx = e.clientX - camera.lastMouseX;
-    const dy = e.clientY - camera.lastMouseY;
-    if (Math.hypot(dx, dy) > 4) camera.dragMoved = true;
-    camera.x += dx;
-    camera.y += dy;
-    camera.lastMouseX = e.clientX;
-    camera.lastMouseY = e.clientY;
-  });
-
-  canvas.addEventListener('pointerup', (e) => {
-    camera.isDragging = false;
-    if (!camera.dragMoved) {
-      handleCanvasClick(e.clientX, e.clientY);
-    }
-  });
-
-  canvas.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const delta = e.deltaY < 0 ? 0.1 : -0.1;
-    zoomVillage(delta);
-  }, { passive: false });
-}
-
-function handleCanvasClick(clientX, clientY) {
-  const rect = canvas.getBoundingClientRect();
-  const sx = clientX - rect.left;
-  const sy = clientY - rect.top;
-
-  for (let i = hitboxes.length - 1; i >= 0; i--) {
-    const hb = hitboxes[i];
-    if (Math.hypot(sx - hb.sx, sy - hb.sy) <= hb.radius) {
-      if (hb.kind === 'dog') {
-        playCozyTone('bark');
+    // 8. Stray Dogs roaming, sitting & wagging tails
+    dogRecords.forEach(d => {
+      d.tailPhase += dt * 14;
+      if (d.mesh.userData.tailGroup) {
+        d.mesh.userData.tailGroup.rotation.z = Math.sin(d.tailPhase) * 0.45;
+      }
+      d.stateTimer -= dt;
+      if (d.stateTimer <= 0) {
+        if (d.state === 'stroll') {
+          d.state = Math.random() < 0.5 ? 'sit' : 'sniff';
+          d.stateTimer = 2.5 + Math.random() * 3.5;
+        } else {
+          d.state = 'stroll';
+          d.stateTimer = 4 + Math.random() * 4;
+          const seg = ROAD_SEGMENTS[Math.floor(Math.random() * ROAD_SEGMENTS.length)];
+          const t = Math.random();
+          d.targetX = seg.x1 + (seg.x2 - seg.x1) * t + (Math.random() - 0.5) * 1.4;
+          d.targetZ = seg.z1 + (seg.z2 - seg.z1) * t + (Math.random() - 0.5) * 1.4;
+          if (isInRiverWorld(d.targetX, d.targetZ, 0.6)) {
+            d.targetZ = 1.2 * CELL;
+          }
+        }
+      }
+
+      if (d.state === 'stroll') {
+        const dx = d.targetX - d.x;
+        const dz = d.targetZ - d.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 0.08) {
+          const speed = 0.75;
+          d.x += (dx / dist) * speed * dt;
+          d.z += (dz / dist) * speed * dt;
+          d.walkPhase += dt * 12;
+          d.mesh.rotation.y = Math.atan2(dx, dz);
+          (d.mesh.userData.legs || []).forEach((leg, idx) => {
+            leg.rotation.x = Math.sin(d.walkPhase + (idx % 2) * Math.PI) * 0.45;
+          });
+        } else {
+          d.state = 'sit';
+        }
       } else {
-        playCozyTone('click');
+        (d.mesh.userData.legs || []).forEach(leg => { leg.rotation.x = 0; });
+        if (d.mesh.userData.headGroup) {
+          d.mesh.userData.headGroup.rotation.x = d.state === 'sniff' ? 0.35 : Math.sin(now * 0.003) * 0.08;
+        }
       }
-      showEntityPopover(hb, sx, sy, rect.width, rect.height);
+
+      if (d.bounceT > 0) d.bounceT = Math.max(0, d.bounceT - dt * 3);
+      const jump = d.bounceT > 0 ? Math.sin(d.bounceT * Math.PI) * 0.35 : 0;
+      d.mesh.position.set(d.x, jump, d.z);
+    });
+
+    // 9. Walking Villagers
+    for (const rec of villagerRecords.values()) {
+      if (rec.waitTimer > 0) {
+        rec.waitTimer -= dt;
+      } else {
+        const dx = rec.targetX - rec.x;
+        const dz = rec.targetZ - rec.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist < 0.1) {
+          rec.waitTimer = 1.5 + Math.random() * 2.5;
+          const seg = ROAD_SEGMENTS[Math.floor(Math.random() * ROAD_SEGMENTS.length)];
+          const t = Math.random();
+          rec.targetX = seg.x1 + (seg.x2 - seg.x1) * t;
+          rec.targetZ = seg.z1 + (seg.z2 - seg.z1) * t;
+        } else {
+          const speed = 0.85;
+          rec.x += (dx / dist) * speed * dt;
+          rec.z += (dz / dist) * speed * dt;
+          rec.walkPhase += dt * 10;
+          rec.group.rotation.y = Math.atan2(dx, dz);
+          const swing = Math.sin(rec.walkPhase) * 0.45;
+          if (rec.group.userData.leftFoot) rec.group.userData.leftFoot.position.z = swing * 0.12;
+          if (rec.group.userData.rightFoot) rec.group.userData.rightFoot.position.z = -swing * 0.12;
+          if (rec.group.userData.leftArm) rec.group.userData.leftArm.rotation.x = -swing;
+          if (rec.group.userData.rightArm) rec.group.userData.rightArm.rotation.x = swing;
+        }
+      }
+      if (rec.bounceT > 0) rec.bounceT = Math.max(0, rec.bounceT - dt * 3);
+      const hop = rec.bounceT > 0 ? Math.sin(rec.bounceT * Math.PI) * 0.3 : 0;
+      rec.group.position.set(rec.x, hop, rec.z);
+    }
+
+    // 10. Train animation
+    if (trainObj) {
+      trainProgress += dt * 0.085;
+      if (trainProgress > 1.4) trainProgress = -0.35;
+      if (trainProgress >= 0 && trainProgress <= 1) {
+        trainObj.visible = true;
+        trainObj.position.z = -8.8 + trainProgress * 16.8;
+      } else {
+        trainObj.visible = false;
+      }
+    }
+
+    // 11. Weather particles
+    if (snowPoints && snowPoints.visible) {
+      const arr = snowPoints.geometry.attributes.position.array;
+      for (let i = 0; i < arr.length; i += 3) {
+        arr[i + 1] -= dt * 1.4;
+        arr[i] += Math.sin(now * 0.001 + i) * dt * 0.25;
+        if (arr[i + 1] < 0) arr[i + 1] = 10;
+      }
+      snowPoints.geometry.attributes.position.needsUpdate = true;
+    }
+    if (petalPoints && petalPoints.visible) {
+      const arr = petalPoints.geometry.attributes.position.array;
+      for (let i = 0; i < arr.length; i += 3) {
+        arr[i + 1] -= dt * 0.95;
+        arr[i] += Math.cos(now * 0.0014 + i) * dt * 0.38;
+        if (arr[i + 1] < 0) arr[i + 1] = 10;
+      }
+      petalPoints.geometry.attributes.position.needsUpdate = true;
+    }
+
+    // 12. Smooth Camera animation & OrbitControls clamping
+    if (controls) {
+      if (camAnimActive) {
+        camera.position.lerp(camGoalPos, Math.min(1, dt * 6));
+        controls.target.lerp(camGoalTarget, Math.min(1, dt * 6));
+        if (camera.position.distanceTo(camGoalPos) < 0.05 && controls.target.distanceTo(camGoalTarget) < 0.05) {
+          camAnimActive = false;
+        }
+      }
+      controls.target.x = Math.max(-7.5, Math.min(7.5, controls.target.x));
+      controls.target.z = Math.max(-7.5, Math.min(7.5, controls.target.z));
+      controls.target.y = Math.max(-0.5, Math.min(2.5, controls.target.y));
+      controls.update();
+    }
+  }
+
+  /* ------------------------------------------------------------------------
+     Raycaster Hover & Click Interactions
+     ------------------------------------------------------------------------ */
+  function updateHoverRaycaster(clientX, clientY) {
+    if (!initialized || !raycaster || !isPointerInside) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(pointerNDC, camera);
+    const targets = [buildingsGroup, dogsGroup, villagersGroup];
+    const hits = raycaster.intersectObjects(targets, true);
+
+    let hitRoot = null;
+    for (const h of hits) {
+      if (h.object && h.object.userData && h.object.userData.interactiveRoot) {
+        hitRoot = h.object.userData.interactiveRoot;
+        break;
+      }
+    }
+
+    hoveredRoot = hitRoot;
+    const tooltip = document.getElementById('hoverTooltip3D');
+    if (hitRoot) {
+      renderer.domElement.style.cursor = 'pointer';
+      if (tooltip) {
+        const kind = hitRoot.userData.kind;
+        const data = hitRoot.userData.entityData;
+        let label = '';
+        if (kind === 'building') label = `🏡 ${data.name} (${data.hours} h)`;
+        else if (kind === 'dog') label = `🐶 ${data.name} (¡Acariciar!)`;
+        else if (kind === 'villager') label = `👋 ${data.name} · ${data.role}`;
+        tooltip.textContent = label;
+        tooltip.style.left = `${Math.min(Math.max(12, clientX - rect.left + 14), rect.width - 220)}px`;
+        tooltip.style.top = `${Math.max(12, clientY - rect.top - 34)}px`;
+        tooltip.classList.remove('hidden');
+      }
+    } else {
+      renderer.domElement.style.cursor = 'grab';
+      if (tooltip) tooltip.classList.add('hidden');
+    }
+  }
+
+  function handleCanvasClick3D(clientX, clientY) {
+    if (!initialized || !raycaster) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(pointerNDC, camera);
+    const hits = raycaster.intersectObjects([buildingsGroup, dogsGroup, villagersGroup], true);
+
+    let hitRoot = null;
+    for (const h of hits) {
+      if (h.object && h.object.userData && h.object.userData.interactiveRoot) {
+        hitRoot = h.object.userData.interactiveRoot;
+        break;
+      }
+    }
+
+    if (!hitRoot) {
+      window.closePopover();
       return;
     }
-  }
-  closePopover();
-}
 
-function showEntityPopover(hb, sx, sy, maxW, maxH) {
-  const pop = document.getElementById('entityPopover');
-  const badge = document.getElementById('popoverBadge');
-  const title = document.getElementById('popoverTitle');
-  const desc = document.getElementById('popoverDesc');
-  const extra = document.getElementById('popoverExtra');
-  if (!pop) return;
+    const kind = hitRoot.userData.kind;
+    const data = hitRoot.userData.entityData;
 
-  if (hb.kind === 'building') {
-    const m = hb.data;
-    badge.textContent = `Edificio · ${m.hours} h`;
-    title.textContent = m.name;
-    desc.textContent = m.desc;
-    if (m.villager) {
-      const vName = state.villagerNames[m.villager.id] || m.villager.defaultName;
-      extra.textContent = `Residente: ${vName} (${m.villager.role})`;
+    // Trigger happy bounce & cozy SFX
+    if (kind === 'dog') {
+      playCozyTone('bark');
+      const rec = dogRecords.find(d => d.mesh === hitRoot);
+      if (rec) rec.bounceT = 1;
+    } else if (kind === 'building') {
+      playCozyTone('click');
+      const rec = buildingRecords.get(data.id);
+      if (rec) rec.bounceT = 1;
     } else {
-      extra.textContent = 'Espacio comunitario del pueblo';
+      playCozyTone('click');
+      const rec = villagerRecords.get(data.id);
+      if (rec) rec.bounceT = 1;
     }
-  } else if (hb.kind === 'dog') {
-    const dog = hb.data;
-    badge.textContent = 'Amigo Peludo';
-    title.textContent = dog.name + ' 🐶';
-    const dogMsgs = [
-      '¡Guau! Mueve la colita alegre de verte estudiar con tanta dedicación.',
-      'Se acerca a saludarte y te da un lametón cariñoso de ánimo.',
-      'Está tumbado al solecito sobre los adoquines disfrutando de la calma del pueblo.',
-      'Olfatea una flor silvestre cerca de tus libros de medicina.'
-    ];
-    desc.textContent = dogMsgs[Math.floor(Math.random() * dogMsgs.length)];
-    extra.textContent = 'Perrito callejero feliz del Valle';
-  } else {
-    const v = hb.data;
-    badge.textContent = 'Habitante del Pueblo';
-    title.textContent = v.name;
-    const greetings = [
-      `«¡Ánimo con el estudio! El pueblo cada día está más bonito gracias a ti.»`,
-      `«Acabo de pasar por la biblioteca, ¡qué tranquilidad se respira hoy!»`,
-      `«Recuerda hidratarte y descansar la vista entre temas de Medicina.»`,
-      `«¡Qué orgullo ver crecer ${state.villageName} minuto a minuto!»`
-    ];
-    desc.textContent = greetings[Math.floor(Math.random() * greetings.length)];
-    extra.textContent = `Oficio: ${v.role} · ${v.milestoneName}`;
+
+    const sx = clientX - rect.left;
+    const sy = clientY - rect.top;
+    window.showEntityPopover({ kind, data }, sx, sy, rect.width, rect.height);
   }
 
-  pop.classList.remove('hidden');
-  const left = Math.min(Math.max(12, sx - 130), maxW - 300);
-  const top = Math.min(Math.max(12, sy - 140), maxH - 170);
-  pop.style.left = `${left}px`;
-  pop.style.top = `${top}px`;
-}
+  /* ------------------------------------------------------------------------
+     Global API Expected by main.js, modals.js, timer.js & HTML
+     ------------------------------------------------------------------------ */
+  window.initAmbientEntities = function () {
+    ensureThreeInitialized();
+  };
 
-function closePopover() {
-  const pop = document.getElementById('entityPopover');
-  if (pop) pop.classList.add('hidden');
-}
+  window.syncVillagersFromMilestones = function () {
+    const unlocked = getUnlockedMilestones();
+    const desired = unlocked.filter(m => m.villager).map(m => ({
+      ...m.villager,
+      milestoneName: m.name,
+      homeGx: m.gx,
+      homeGy: m.gy
+    }));
+
+    activeVillagers = desired.map((dv, idx) => {
+      const existing = activeVillagers.find(v => v.id === dv.id);
+      if (existing) {
+        return {
+          ...existing,
+          name: state.villagerNames[dv.id] || dv.defaultName,
+          role: dv.role,
+          milestoneName: dv.milestoneName
+        };
+      }
+      return {
+        id: dv.id,
+        name: state.villagerNames[dv.id] || dv.defaultName,
+        role: dv.role,
+        milestoneName: dv.milestoneName,
+        color: dv.color,
+        gx: dv.homeGx + 0.35,
+        gy: dv.homeGy + 0.65,
+        targetGx: (idx % 5) - 2,
+        targetGy: 1
+      };
+    });
+
+    if (initialized) {
+      syncSceneFromState();
+    }
+  };
+
+  window.setupCanvasInteractions = function () {
+    if (!ensureThreeInitialized()) return;
+    const dom = renderer.domElement;
+
+    dom.addEventListener('pointerenter', () => { isPointerInside = true; });
+    dom.addEventListener('pointerleave', () => {
+      isPointerInside = false;
+      hoveredRoot = null;
+      const tooltip = document.getElementById('hoverTooltip3D');
+      if (tooltip) tooltip.classList.add('hidden');
+    });
+
+    dom.addEventListener('pointerdown', (e) => {
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+    });
+
+    dom.addEventListener('pointermove', (e) => {
+      if (e.buttons === 0) {
+        updateHoverRaycaster(e.clientX, e.clientY);
+      } else {
+        const tooltip = document.getElementById('hoverTooltip3D');
+        if (tooltip) tooltip.classList.add('hidden');
+      }
+    });
+
+    dom.addEventListener('pointerup', (e) => {
+      const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      if (dist < 6) {
+        handleCanvasClick3D(e.clientX, e.clientY);
+      }
+    });
+
+    // Restore lighting label from state
+    const labels = { auto: 'Luz: Auto', day: 'Luz: Día', sunset: 'Luz: Atardecer', night: 'Luz: Noche' };
+    const lbl = document.getElementById('timeOfDayLabel');
+    if (lbl && state && state.timeOfDayMode) {
+      lbl.textContent = labels[state.timeOfDayMode] || 'Luz: Auto';
+    }
+  };
+
+  window.getEffectiveLighting = function () {
+    if (state.timeOfDayMode !== 'auto') return state.timeOfDayMode;
+    const hour = new Date().getHours();
+    if (hour >= 7 && hour < 17) return 'day';
+    if ((hour >= 17 && hour < 20) || (hour >= 6 && hour < 7)) return 'sunset';
+    return 'night';
+  };
+
+  window.cycleTimeOfDay = function () {
+    playCozyTone('click');
+    const order = ['auto', 'day', 'sunset', 'night'];
+    const labels = { auto: 'Luz: Auto', day: 'Luz: Día', sunset: 'Luz: Atardecer', night: 'Luz: Noche' };
+    const next = order[(order.indexOf(state.timeOfDayMode) + 1) % order.length];
+    state.timeOfDayMode = next;
+    saveState();
+    const lbl = document.getElementById('timeOfDayLabel');
+    if (lbl) lbl.textContent = labels[next];
+  };
+
+  window.zoomVillage = function (delta) {
+    if (!camera || !controls) return;
+    const dir = new THREE.Vector3().subVectors(camera.position, controls.target);
+    const dist = dir.length();
+    const nextDist = Math.min(controls.maxDistance, Math.max(controls.minDistance, dist * (delta > 0 ? 0.84 : 1.18)));
+    dir.normalize().multiplyScalar(nextDist);
+    camGoalPos.copy(controls.target).add(dir);
+    camGoalTarget.copy(controls.target);
+    camAnimActive = true;
+  };
+
+  window.resetCamera = function () {
+    if (!camera || !controls) return;
+    const factor = window.innerWidth < 640 ? 1.28 : 1.0;
+    camGoalPos.copy(DEFAULT_CAM_POS).multiplyScalar(factor);
+    camGoalTarget.copy(DEFAULT_TARGET);
+    camAnimActive = true;
+  };
+
+  window.toggleFullscreenVillage = function () {
+    const wrap = document.getElementById('villageCanvasWrapper');
+    if (!wrap) return;
+    wrap.classList.toggle('fullscreen-village');
+    window.resizeCanvas();
+  };
+
+  window.resizeCanvas = function () {
+    const wrap = document.getElementById('villageCanvasWrapper');
+    if (!wrap || !renderer || !camera) return;
+    const w = Math.max(1, wrap.clientWidth);
+    const h = Math.max(1, wrap.clientHeight);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(w, h, false);
+  };
+
+  window.villageLoop = function (now) {
+    const dt = Math.min(0.05, (now - lastFrameNow) / 1000);
+    lastFrameNow = now;
+
+    if (ensureThreeInitialized()) {
+      syncSceneFromState();
+      updateAtmosphere(now);
+      updateSimulation(dt, now);
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame(window.villageLoop);
+  };
+
+  window.showEntityPopover = function (hb, sx, sy, maxW, maxH) {
+    const pop = document.getElementById('entityPopover');
+    const badge = document.getElementById('popoverBadge');
+    const title = document.getElementById('popoverTitle');
+    const desc = document.getElementById('popoverDesc');
+    const extra = document.getElementById('popoverExtra');
+    if (!pop) return;
+
+    if (hb.kind === 'building') {
+      const m = hb.data;
+      badge.textContent = `Edificio · ${m.hours} h`;
+      title.textContent = m.name;
+      desc.textContent = m.desc;
+      if (m.villager) {
+        const vName = state.villagerNames[m.villager.id] || m.villager.defaultName;
+        extra.textContent = `Residente: ${vName} (${m.villager.role})`;
+      } else {
+        extra.textContent = 'Espacio comunitario del pueblo';
+      }
+    } else if (hb.kind === 'dog') {
+      const dog = hb.data;
+      badge.textContent = 'Amigo Peludo';
+      title.textContent = dog.name + ' 🐶';
+      const dogMsgs = [
+        '¡Guau! Mueve la colita alegre de verte estudiar con tanta dedicación.',
+        'Se acerca a saludarte y te da un lametón cariñoso de ánimo.',
+        'Está tumbado al solecito sobre los adoquines disfrutando de la calma del pueblo.',
+        'Olfatea una flor silvestre cerca de tus libros de medicina.'
+      ];
+      desc.textContent = dogMsgs[Math.floor(Math.random() * dogMsgs.length)];
+      extra.textContent = 'Perrito callejero feliz del Valle';
+    } else {
+      const v = hb.data;
+      badge.textContent = 'Habitante del Pueblo';
+      title.textContent = v.name;
+      const greetings = [
+        `«¡Ánimo con el estudio! El pueblo cada día está más bonito gracias a ti.»`,
+        `«Acabo de pasar por la biblioteca, ¡qué tranquilidad se respira hoy!»`,
+        `«Recuerda hidratarte y descansar la vista entre temas de Medicina.»`,
+        `«¡Qué orgullo ver crecer ${state.villageName} minuto a minuto!»`
+      ];
+      desc.textContent = greetings[Math.floor(Math.random() * greetings.length)];
+      extra.textContent = `Oficio: ${v.role} · ${v.milestoneName}`;
+    }
+
+    pop.classList.remove('hidden');
+    const left = Math.min(Math.max(12, sx - 130), maxW - 300);
+    const top = Math.min(Math.max(12, sy - 140), maxH - 170);
+    pop.style.left = `${left}px`;
+    pop.style.top = `${top}px`;
+  };
+
+  window.closePopover = function () {
+    const pop = document.getElementById('entityPopover');
+    if (pop) pop.classList.add('hidden');
+  };
+
+  /* ------------------------------------------------------------------------
+     3D Thumbnail Snapshot for Celebration Modal (reusing main WebGLRenderer)
+     ------------------------------------------------------------------------ */
+  window.drawBuildingSprite = function (mctx, x, y, scale, type, scaleY = 1, now = 0, bPal = null, sPal = null) {
+    if (!mctx) return;
+    try {
+      if (ensureThreeInitialized() && renderer) {
+        const size = 224;
+        if (!miniRT) {
+          miniRT = new THREE.WebGLRenderTarget(size, size);
+          miniRT.texture.encoding = THREE.sRGBEncoding;
+          miniScene = new THREE.Scene();
+          miniScene.background = new THREE.Color(0xE8F1E8);
+          miniCam = new THREE.PerspectiveCamera(34, 1, 0.1, 40);
+          miniCam.position.set(3.1, 2.5, 3.1);
+          miniCam.lookAt(0, 0.55, 0);
+          miniScene.add(new THREE.HemisphereLight(0xFFF6E8, 0x8BA88E, 0.95));
+          const dl = new THREE.DirectionalLight(0xFFF1D6, 0.9);
+          dl.position.set(4, 7, 4);
+          miniScene.add(dl);
+        }
+
+        // Remove previous temporary preview mesh
+        const old = miniScene.getObjectByName('previewBuilding');
+        if (old) miniScene.remove(old);
+
+        const pal = bPal || ARCHITECTURAL_PALETTES[state.buildingStyle] || ARCHITECTURAL_PALETTES.cottagecore;
+        const seas = sPal || SEASON_PALETTES[state.season] || SEASON_PALETTES.spring;
+        const model = window.VillageBuilders.buildBuilding3D(type, pal, seas);
+        model.name = 'previewBuilding';
+        miniScene.add(model);
+
+        const prevTarget = renderer.getRenderTarget();
+        renderer.setRenderTarget(miniRT);
+        renderer.clear();
+        renderer.render(miniScene, miniCam);
+
+        const buf = new Uint8Array(size * size * 4);
+        renderer.readRenderTargetPixels(miniRT, 0, 0, size, size, buf);
+        renderer.setRenderTarget(prevTarget);
+
+        // Flip vertically into offscreen 2D canvas, then draw scaled onto celebrationMiniCanvas
+        const tempC = document.createElement('canvas');
+        tempC.width = size;
+        tempC.height = size;
+        const tctx = tempC.getContext('2d');
+        const imgData = tctx.createImageData(size, size);
+        for (let row = 0; row < size; row++) {
+          const srcOffset = (size - 1 - row) * size * 4;
+          const dstOffset = row * size * 4;
+          imgData.data.set(buf.subarray(srcOffset, srcOffset + size * 4), dstOffset);
+        }
+        tctx.putImageData(imgData, 0, 0);
+
+        mctx.clearRect(0, 0, mctx.canvas.width, mctx.canvas.height);
+        mctx.drawImage(tempC, 0, 0, mctx.canvas.width, mctx.canvas.height);
+        return;
+      }
+    } catch (err) {
+      // Safe fallback below if WebGL render target snapshot fails
+    }
+
+    // Fallback cute vector icon
+    mctx.clearRect(0, 0, mctx.canvas.width, mctx.canvas.height);
+    mctx.fillStyle = '#C97B63';
+    mctx.beginPath();
+    mctx.moveTo(x - 24, y - 16);
+    mctx.lineTo(x, y - 42);
+    mctx.lineTo(x + 24, y - 16);
+    mctx.closePath();
+    mctx.fill();
+    mctx.fillStyle = '#FAF6EE';
+    mctx.fillRect(x - 18, y - 16, 36, 22);
+    mctx.fillStyle = '#7C5841';
+    mctx.fillRect(x - 5, y - 8, 10, 14);
+  };
+})();
