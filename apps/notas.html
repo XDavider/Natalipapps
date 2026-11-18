@@ -3,14 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Notas Rápidas - Natalipapp</title>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+  <title>Notas Dulces 📝 — Natalipapps</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Quicksand:wght@400;500;600&family=Caveat:wght@600&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Outfit', sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
+      font-family: 'Quicksand', sans-serif;
+      background-color: #fff9f5;
+      background-image: radial-gradient(#fed7aa 0.75px, transparent 0.75px);
+      background-size: 24px 24px;
+      color: #4a3b32;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -21,59 +25,94 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 1.5rem;
-      max-width: 800px;
+      max-width: 750px;
       margin-left: auto;
       margin-right: auto;
       width: 100%;
     }
     .back-btn {
-      color: #94a3b8;
+      color: #8c7365;
       text-decoration: none;
       font-size: 0.95rem;
-      display: flex;
+      font-weight: 600;
+      display: inline-flex;
       align-items: center;
       gap: 0.4rem;
-      transition: color 0.2s;
+      padding: 0.5rem 1rem;
+      background: #ffffff;
+      border: 1.5px solid #fce7f3;
+      border-radius: 999px;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 6px rgba(244, 114, 182, 0.1);
     }
-    .back-btn:hover { color: #f43f5e; }
+    .back-btn:hover {
+      border-color: #f472b6;
+      color: #db2777;
+      transform: translateX(-3px);
+    }
     .status {
-      font-size: 0.8rem;
-      color: #10b981;
+      font-size: 0.85rem;
+      color: #059669;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      font-weight: 600;
     }
-    .container {
-      max-width: 800px;
+    .notebook {
+      max-width: 750px;
       margin: 0 auto;
       width: 100%;
       flex: 1;
       display: flex;
       flex-direction: column;
+      background: #ffffff;
+      border-radius: 24px;
+      border: 2px solid #fce7f3;
+      box-shadow: 0 15px 35px -10px rgba(244, 114, 182, 0.15);
+      padding: 2rem;
+      position: relative;
+    }
+    .notebook-header {
+      font-family: 'Comfortaa', cursive;
+      font-size: 1.4rem;
+      color: #83274e;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
     textarea {
       flex: 1;
       width: 100%;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 1.25rem;
-      color: #fff;
-      font-family: inherit;
-      font-size: 1.1rem;
-      line-height: 1.6;
+      background: transparent;
+      border: none;
+      color: #4a3b32;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 1.15rem;
+      line-height: 2rem;
       resize: none;
       outline: none;
+      background-attachment: local;
+      background-image: repeating-linear-gradient(transparent, transparent 31px, #fce7f3 31px, #fce7f3 32px);
+      padding-top: 6px;
     }
-    textarea:focus {
-      border-color: #ec4899;
+    textarea::placeholder {
+      color: #d1b8ab;
+      font-style: italic;
     }
   </style>
 </head>
 <body>
   <div class="header">
     <a href="../index.html" class="back-btn">&larr; Volver al Hub</a>
-    <span class="status" id="status">Guardado automático activo</span>
+    <span class="status" id="status">✨ Libreta lista</span>
   </div>
-  <div class="container">
-    <textarea id="notes" placeholder="Escribe tus notas aquí... Se guardan automáticamente en tu dispositivo."></textarea>
+  <div class="notebook">
+    <div class="notebook-header">
+      <span>🍓</span> Mis Notas & Ideas
+    </div>
+    <textarea id="notes" placeholder="Querido diario... Escribe aquí lo que quieras 🧁 Se guarda solo."></textarea>
   </div>
 
   <script>
@@ -84,10 +123,16 @@
 
     notesArea.addEventListener('input', () => {
       localStorage.setItem('natalipapp_notes', notesArea.value);
-      status.textContent = 'Guardando...';
+      status.textContent = '🧁 Guardando...';
+      status.style.color = '#db2777';
+      status.style.background = '#fdf2f8';
+      status.style.borderColor = '#fbcfe8';
       setTimeout(() => {
-        status.textContent = 'Guardado';
-      }, 400);
+        status.textContent = '✨ Guardado con amor';
+        status.style.color = '#059669';
+        status.style.background = '#ecfdf5';
+        status.style.borderColor = '#a7f3d0';
+      }, 500);
     });
   </script>
 </body>

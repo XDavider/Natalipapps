@@ -3,14 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tomador de Decisiones - Natalipapp</title>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <title>Ruleta Cupcake 🍓 — Natalipapps</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@600;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Outfit', sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
+      font-family: 'Quicksand', sans-serif;
+      background-color: #fff9f5;
+      background-image: 
+        radial-gradient(circle at 20% 20%, rgba(251, 207, 232, 0.4) 0%, transparent 45%),
+        radial-gradient(circle at 80% 80%, rgba(254, 215, 170, 0.4) 0%, transparent 45%);
+      color: #4a3b32;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -19,72 +24,113 @@
     }
     .header {
       width: 100%;
-      max-width: 500px;
+      max-width: 480px;
       margin-bottom: 2rem;
     }
     .back-btn {
-      color: #94a3b8;
+      color: #8c7365;
       text-decoration: none;
       font-size: 0.95rem;
-      transition: color 0.2s;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 1rem;
+      background: #ffffff;
+      border: 1.5px solid #fce7f3;
+      border-radius: 999px;
+      box-shadow: 0 2px 6px rgba(244, 114, 182, 0.1);
+      transition: all 0.2s ease;
     }
-    .back-btn:hover { color: #ec4899; }
+    .back-btn:hover {
+      border-color: #f472b6;
+      color: #db2777;
+      transform: translateX(-3px);
+    }
     .card {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 16px;
-      padding: 2rem;
+      background: rgba(255, 255, 255, 0.9);
+      border: 2px solid #fce7f3;
+      border-radius: 28px;
+      padding: 2.2rem;
       width: 100%;
-      max-width: 500px;
+      max-width: 480px;
       text-align: center;
+      box-shadow: 0 15px 35px -10px rgba(244, 114, 182, 0.2);
+      backdrop-filter: blur(8px);
+    }
+    .cupcake-avatar {
+      font-size: 3rem;
+      margin-bottom: 0.5rem;
+      display: inline-block;
+      animation: float 3s ease-in-out infinite alternate;
+    }
+    @keyframes float {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-8px); }
     }
     h1 {
+      font-family: 'Comfortaa', cursive;
       font-size: 1.8rem;
       margin-bottom: 0.5rem;
-      color: #ec4899;
+      color: #83274e;
     }
     p {
-      color: #94a3b8;
+      color: #8c7365;
       font-size: 0.95rem;
       margin-bottom: 1.5rem;
+      font-weight: 500;
     }
     textarea {
       width: 100%;
       height: 120px;
-      background: rgba(0, 0, 0, 0.25);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 10px;
-      padding: 0.75rem;
-      color: #fff;
-      font-family: inherit;
+      background: #fffdfc;
+      border: 2px solid #fce7f3;
+      border-radius: 16px;
+      padding: 0.9rem;
+      color: #4a3b32;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 1rem;
+      line-height: 1.5;
       resize: vertical;
-      margin-bottom: 1rem;
+      margin-bottom: 1.2rem;
       outline: none;
+      transition: border-color 0.2s;
     }
-    textarea:focus { border-color: #ec4899; }
+    textarea:focus {
+      border-color: #f472b6;
+      box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.15);
+    }
     button {
-      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      background: linear-gradient(135deg, #f472b6, #fb7185);
       color: white;
       border: none;
-      padding: 0.8rem 1.8rem;
-      font-size: 1rem;
-      font-weight: 600;
+      padding: 0.9rem 2rem;
+      font-size: 1.05rem;
+      font-family: 'Comfortaa', cursive;
+      font-weight: 700;
       border-radius: 9999px;
       cursor: pointer;
       width: 100%;
-      transition: transform 0.1s, opacity 0.2s;
+      box-shadow: 0 8px 18px rgba(244, 114, 182, 0.35);
+      transition: transform 0.1s, box-shadow 0.2s;
     }
-    button:active { transform: scale(0.98); }
+    button:hover {
+      box-shadow: 0 10px 22px rgba(244, 114, 182, 0.45);
+    }
+    button:active {
+      transform: scale(0.97);
+    }
     .result {
-      margin-top: 1.5rem;
+      margin-top: 1.6rem;
       padding: 1.25rem;
-      border-radius: 12px;
-      background: rgba(236, 72, 153, 0.1);
-      border: 1px solid rgba(236, 72, 153, 0.3);
-      font-size: 1.3rem;
+      border-radius: 20px;
+      background: #fdf2f8;
+      border: 2px dashed #f9a8d4;
+      font-family: 'Comfortaa', cursive;
+      font-size: 1.25rem;
       font-weight: 700;
-      color: #f472b6;
-      min-height: 60px;
+      color: #be185d;
+      min-height: 70px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -96,11 +142,12 @@
     <a href="../index.html" class="back-btn">&larr; Volver al Hub</a>
   </div>
   <div class="card">
-    <h1>¿Indeciso? 🎯</h1>
-    <p>Introduce una opción por línea y deja que el azar decida:</p>
-    <textarea id="options" placeholder="Pizza&#10;Hamburguesa&#10;Sushi&#10;Tacos">Pizza&#10;Hamburguesa&#10;Sushi&#10;Tacos</textarea>
-    <button onclick="decide()">¡Elegir por mí!</button>
-    <div id="result" class="result">Esperando opciones...</div>
+    <div class="cupcake-avatar">🧁</div>
+    <h1>¿Indecisa?</h1>
+    <p>Escribe una opción por línea y deja que el cupcake elija tu destino:</p>
+    <textarea id="options">🍓 Merendar tortitas&#10;☕ Café con leche y lectura&#10;🍰 Paseo tranquilo&#10;🎬 Peli cozy con manta</textarea>
+    <button onclick="decide()">¡Elegir por mí! ✨</button>
+    <div id="result" class="result">Esperando opciones dulces... 🌸</div>
   </div>
 
   <script>
@@ -110,19 +157,19 @@
       const resBox = document.getElementById('result');
 
       if (list.length === 0) {
-        resBox.textContent = 'Escribe al menos una opción.';
+        resBox.textContent = '¡Escribe al menos una opción! 🧁';
         return;
       }
 
-      resBox.textContent = 'Pensando... 🤔';
+      resBox.textContent = 'Mezclando ingredientes... 🥣';
       let count = 0;
       const interval = setInterval(() => {
         resBox.textContent = list[Math.floor(Math.random() * list.length)];
         count++;
-        if (count > 10) {
+        if (count > 12) {
           clearInterval(interval);
           const chosen = list[Math.floor(Math.random() * list.length)];
-          resBox.textContent = '✨ ' + chosen + ' ✨';
+          resBox.textContent = '✨ ' + chosen + ' 🎀';
         }
       }, 70);
     }
