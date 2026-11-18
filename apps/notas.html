@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notas Rápidas - Natalipapp</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 1.5rem;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+      width: 100%;
+    }
+    .back-btn {
+      color: #94a3b8;
+      text-decoration: none;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: color 0.2s;
+    }
+    .back-btn:hover { color: #f43f5e; }
+    .status {
+      font-size: 0.8rem;
+      color: #10b981;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    textarea {
+      flex: 1;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 1.25rem;
+      color: #fff;
+      font-family: inherit;
+      font-size: 1.1rem;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+    }
+    textarea:focus {
+      border-color: #ec4899;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <a href="../index.html" class="back-btn">&larr; Volver al Hub</a>
+    <span class="status" id="status">Guardado automático activo</span>
+  </div>
+  <div class="container">
+    <textarea id="notes" placeholder="Escribe tus notas aquí... Se guardan automáticamente en tu dispositivo."></textarea>
+  </div>
+
+  <script>
+    const notesArea = document.getElementById('notes');
+    const status = document.getElementById('status');
+
+    notesArea.value = localStorage.getItem('natalipapp_notes') || '';
+
+    notesArea.addEventListener('input', () => {
+      localStorage.setItem('natalipapp_notes', notesArea.value);
+      status.textContent = 'Guardando...';
+      setTimeout(() => {
+        status.textContent = 'Guardado';
+      }, 400);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tomador de Decisiones - Natalipapp</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+    .header {
+      width: 100%;
+      max-width: 500px;
+      margin-bottom: 2rem;
+    }
+    .back-btn {
+      color: #94a3b8;
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: color 0.2s;
+    }
+    .back-btn:hover { color: #ec4899; }
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+    }
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+      color: #ec4899;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+    textarea {
+      width: 100%;
+      height: 120px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 0.75rem;
+      color: #fff;
+      font-family: inherit;
+      resize: vertical;
+      margin-bottom: 1rem;
+      outline: none;
+    }
+    textarea:focus { border-color: #ec4899; }
+    button {
+      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      color: white;
+      border: none;
+      padding: 0.8rem 1.8rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      cursor: pointer;
+      width: 100%;
+      transition: transform 0.1s, opacity 0.2s;
+    }
+    button:active { transform: scale(0.98); }
+    .result {
+      margin-top: 1.5rem;
+      padding: 1.25rem;
+      border-radius: 12px;
+      background: rgba(236, 72, 153, 0.1);
+      border: 1px solid rgba(236, 72, 153, 0.3);
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #f472b6;
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <a href="../index.html" class="back-btn">&larr; Volver al Hub</a>
+  </div>
+  <div class="card">
+    <h1>¿Indeciso? 🎯</h1>
+    <p>Introduce una opción por línea y deja que el azar decida:</p>
+    <textarea id="options" placeholder="Pizza&#10;Hamburguesa&#10;Sushi&#10;Tacos">Pizza&#10;Hamburguesa&#10;Sushi&#10;Tacos</textarea>
+    <button onclick="decide()">¡Elegir por mí!</button>
+    <div id="result" class="result">Esperando opciones...</div>
+  </div>
+
+  <script>
+    function decide() {
+      const raw = document.getElementById('options').value;
+      const list = raw.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+      const resBox = document.getElementById('result');
+
+      if (list.length === 0) {
+        resBox.textContent = 'Escribe al menos una opción.';
+        return;
+      }
+
+      resBox.textContent = 'Pensando... 🤔';
+      let count = 0;
+      const interval = setInterval(() => {
+        resBox.textContent = list[Math.floor(Math.random() * list.length)];
+        count++;
+        if (count > 10) {
+          clearInterval(interval);
+          const chosen = list[Math.floor(Math.random() * list.length)];
+          resBox.textContent = '✨ ' + chosen + ' ✨';
+        }
+      }, 70);
+    }
+  </script>
+</body>
+</html>
