@@ -1,0 +1,131 @@
+/* ==========================================================================
+   My Study Village · Stylesheet (Cozy, Stardew Valley & Lofi aesthetics)
+   ========================================================================== */
+
+:root {
+  --bg-cream: #FAF6EE;
+  --bg-warm: #F3ECE0;
+  --bg-beige: #E8DEC8;
+  --wood: #7C5841;
+  --wood-dark: #5C3E2B;
+  --sage: #8FA893;
+  --sage-dark: #6E8B74;
+  --sage-deep: #4D6753;
+  --gold: #D4A359;
+  --gold-dark: #B58338;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: 'Quicksand', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-cream);
+  color: var(--wood-dark);
+  background-image:
+    radial-gradient(rgba(143, 168, 147, 0.16) 1.2px, transparent 1.2px),
+    radial-gradient(rgba(212, 163, 89, 0.12) 1.2px, var(--bg-cream) 1.2px);
+  background-size: 28px 28px;
+  background-position: 0 0, 14px 14px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, .font-serif-cozy {
+  font-family: 'Fraunces', Georgia, serif;
+}
+
+/* Cozy Scrollbars estilo cuaderno */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #F3ECE0;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb {
+  background: #C7B69E;
+  border-radius: 999px;
+  border: 2px solid #F3ECE0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8FA893;
+}
+
+/* Botones táctiles estilo videojuego retro / cozy */
+.btn-cozy {
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.15s ease;
+}
+.btn-cozy:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #5C3E2B !important;
+}
+
+/* Cartel de madera tallada (Animal Crossing plaque) */
+.wooden-plaque {
+  background: linear-gradient(180deg, #8B644B 0%, #7C5841 100%);
+  border: 2px solid #5C3E2B;
+  box-shadow: 0 4px 0 #5C3E2B, inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  color: #FAF6EE;
+}
+
+/* Tarjeta de pergamino suave */
+.cozy-card {
+  background: rgba(250, 246, 238, 0.96);
+  border: 2px solid #E2D5BE;
+  box-shadow: 0 8px 22px -6px rgba(92, 62, 43, 0.12);
+  border-radius: 1.25rem;
+}
+
+/* Contenedor del lienzo de juego */
+#villageCanvasWrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 440px;
+  border-radius: 1.35rem;
+  overflow: hidden;
+  border: 3px solid #7C5841;
+  box-shadow: 0 10px 28px rgba(92, 62, 43, 0.18), inset 0 0 0 2px rgba(232, 192, 125, 0.35);
+  background: #9CC09F;
+  touch-action: none;
+  user-select: none;
+}
+
+#villageCanvasWrapper.fullscreen-village {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 60 !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+canvas#villageCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+canvas#villageCanvas:active {
+  cursor: grabbing;
+}
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+.animate-float {
+  animation: floatSlow 3.5s ease-in-out infinite;
+}
+
+@keyframes popIn {
+  0% { opacity: 0; transform: scale(0.9) translateY(10px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-pop {
+  animation: popIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}

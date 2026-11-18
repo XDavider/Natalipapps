@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Study Village — Tu Pueblo de Estudio Acogedor</title>
+  
+  <!-- Tipografías Cozy & Lofi -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  
+  <!-- Tailwind CSS CDN con paleta Cozy personalizada -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sage: {
+              light: '#B5C9B8',
+              DEFAULT: '#8FA893',
+              dark: '#6E8B74',
+              deep: '#4D6753'
+            },
+            cream: {
+              DEFAULT: '#FAF6EE',
+              warm: '#F3ECE0',
+              beige: '#E8DEC8'
+            },
+            pastel: {
+              blue: '#A8C8D8',
+              blueDark: '#7EA8BE',
+              pink: '#E2B4BD',
+              pinkDark: '#D198A4'
+            },
+            wood: {
+              light: '#9E765B',
+              DEFAULT: '#7C5841',
+              dark: '#5C3E2B'
+            },
+            gold: {
+              light: '#E8C07D',
+              DEFAULT: '#D4A359',
+              dark: '#B58338'
+            }
+          },
+          fontFamily: {
+            display: ['Fraunces', 'Georgia', 'serif'],
+            sans: ['Quicksand', 'system-ui', '-apple-system', 'sans-serif']
+          },
+          boxShadow: {
+            cozy: '0 8px 24px -4px rgba(92, 62, 43, 0.12), 0 2px 6px -1px rgba(92, 62, 43, 0.08)',
+            wood: '0 4px 0 #5C3E2B, 0 8px 16px rgba(92, 62, 43, 0.2)',
+            woodSm: '0 3px 0 #5C3E2B'
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Hoja de estilos desacoplada -->
+  <link rel="stylesheet" href="css/village.css" />
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="sticky top-0 z-40 bg-cream/95 backdrop-blur-md border-b-2 border-cream-beige px-3 sm:px-6 py-2.5 shadow-sm">
+    <div class="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Back to HUB and Village Name Plaque -->
+      <div class="flex items-center gap-2.5">
+        <a href="../../index.html" class="p-2 rounded-xl bg-cream-warm hover:bg-cream-beige/70 border border-cream-beige text-wood-dark transition flex items-center gap-1 text-xs font-bold" title="Volver al HUB de Natalipapps">
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"/></svg>
+          <span class="hidden md:inline">Hub</span>
+        </a>
+
+        <button onclick="openTab('personalizacion')" title="Haz clic para renombrar tu pueblo" class="wooden-plaque px-4 py-1.5 rounded-2xl flex items-center gap-2.5 group cursor-pointer transition hover:brightness-105">
+          <svg class="w-6 h-6 text-gold-light shrink-0" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3L2 11h3v9h6v-6h2v6h6v-9h3L12 3zm0 4.8l4 3.2v7h-1v-6H9v6H8v-7l4-3.2z"/>
+          </svg>
+          <div class="text-left">
+            <div class="flex items-center gap-1.5">
+              <span id="headerVillageName" class="font-display font-bold text-base sm:text-lg tracking-wide leading-tight">Valle de Hipócrates</span>
+              <svg class="w-3.5 h-3.5 text-gold-light opacity-75 group-hover:opacity-100" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+              </svg>
+            </div>
+            <p id="headerVillageSubtitle" class="text-[11px] text-cream-beige/90 font-medium leading-none mt-0.5">Aldea Inicial · 0 habitantes</p>
+          </div>
+        </button>
+
+        <!-- Quick Streak & Total Pill -->
+        <div class="hidden xl:flex items-center gap-2 bg-cream-warm border border-cream-beige px-3.5 py-1.5 rounded-2xl text-xs font-semibold">
+          <span class="flex items-center gap-1 text-wood-dark" title="Racha actual de días estudiando">
+            <svg class="w-4 h-4 text-gold-dark" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd"/></svg>
+            <span id="topStreakDisplay">0 días</span>
+          </span>
+          <span class="text-cream-beige">|</span>
+          <span class="flex items-center gap-1 text-sage-deep" title="Horas totales acumuladas">
+            <svg class="w-4 h-4 text-sage-dark" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+            <span id="topTotalHoursDisplay">0.0 h</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex items-center gap-1.5 bg-cream-warm p-1.5 rounded-2xl border border-cream-beige overflow-x-auto max-w-full">
+        <button data-tab="pueblo" onclick="openTab('pueblo')" class="nav-tab active px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition cursor-pointer bg-sage-dark text-cream shadow-sm">
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+          <span>Mi Pueblo</span>
+        </button>
+        <button data-tab="sesiones" onclick="openTab('sesiones')" class="nav-tab px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition cursor-pointer text-wood-dark hover:bg-cream-beige/70">
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+          <span>Diario</span>
+        </button>
+        <button data-tab="estadisticas" onclick="openTab('estadisticas')" class="nav-tab px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition cursor-pointer text-wood-dark hover:bg-cream-beige/70">
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+          <span>Estadísticas</span>
+        </button>
+        <button data-tab="coleccion" onclick="openTab('coleccion')" class="nav-tab px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition cursor-pointer text-wood-dark hover:bg-cream-beige/70">
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+          <span>Edificios</span>
+        </button>
+        <button data-tab="personalizacion" onclick="openTab('personalizacion')" class="nav-tab px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition cursor-pointer text-wood-dark hover:bg-cream-beige/70">
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+          <span>Personalizar</span>
+        </button>
+      </nav>
+
+      <!-- Sound & Download HTML Action -->
+      <div class="flex items-center gap-2">
+        <button id="soundToggleBtn" onclick="toggleSound()" title="Activar/Desactivar sonidos suaves" class="p-2 rounded-xl bg-cream-warm border border-cream-beige text-wood-dark hover:bg-cream-beige transition cursor-pointer">
+          <svg id="soundIconOn" class="w-5 h-5 text-sage-dark" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clip-rule="evenodd"/></svg>
+          <svg id="soundIconOff" class="w-5 h-5 text-wood-light hidden" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+        </button>
+        <button onclick="downloadStandaloneHTML()" title="Descargar esta aplicación como archivo HTML único" class="btn-cozy px-3 py-1.5 rounded-xl bg-gold text-white font-bold text-xs shadow-woodSm flex items-center gap-1.5 hover:bg-gold-dark cursor-pointer">
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          <span class="hidden sm:inline">Guardar App (.html)</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT AREA -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto p-3 sm:p-5">
+
+    <!-- TAB 1: MI PUEBLO (MAIN HERO VIEW) -->
+    <section id="tab-pueblo" class="tab-content grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-stretch">
+      
+      <!-- LEFT / CENTER HERO: ISOMETRIC VILLAGE CANVAS (8 cols) -->
+      <div class="lg:col-span-8 flex flex-col gap-3">
+        <div id="villageCanvasWrapper" class="h-[54vh] sm:h-[64vh] lg:h-[74vh] min-h-[430px]">
+          <canvas id="villageCanvas"></canvas>
+
+          <!-- Top-Left Floating HUD: Season, Time of Day & Preview Mode -->
+          <div class="absolute top-3 left-3 flex flex-wrap items-center gap-2 z-10 pointer-events-auto">
+            <div class="bg-cream/90 backdrop-blur-md border-2 border-wood/40 rounded-2xl px-2.5 py-1 shadow-md flex items-center gap-1">
+              <button onclick="setSeason('spring')" id="btnSeason-spring" class="season-pill px-2 py-0.5 rounded-xl text-xs font-bold transition cursor-pointer" title="Primavera">Primavera</button>
+              <button onclick="setSeason('summer')" id="btnSeason-summer" class="season-pill px-2 py-0.5 rounded-xl text-xs font-bold transition cursor-pointer" title="Verano">Verano</button>
+              <button onclick="setSeason('autumn')" id="btnSeason-autumn" class="season-pill px-2 py-0.5 rounded-xl text-xs font-bold transition cursor-pointer" title="Otoño">Otoño</button>
+              <button onclick="setSeason('winter')" id="btnSeason-winter" class="season-pill px-2 py-0.5 rounded-xl text-xs font-bold transition cursor-pointer" title="Invierno">Invierno</button>
+            </div>
+
+            <button onclick="cycleTimeOfDay()" id="timeOfDayBtn" class="bg-cream/90 backdrop-blur-md border-2 border-wood/40 rounded-2xl px-3 py-1 shadow-md text-xs font-bold text-wood-dark hover:bg-cream transition flex items-center gap-1.5 cursor-pointer" title="Cambiar iluminación del cielo">
+              <span id="timeOfDayLabel">Luz: Auto</span>
+            </button>
+          </div>
+
+          <!-- Top-Right Floating Controls: Zoom, Center, Fullscreen -->
+          <div class="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+            <button onclick="zoomVillage(0.15)" class="w-9 h-9 rounded-xl bg-cream/90 backdrop-blur border-2 border-wood/40 text-wood-dark font-bold shadow hover:bg-cream flex items-center justify-center cursor-pointer" title="Acercar">+</button>
+            <button onclick="zoomVillage(-0.15)" class="w-9 h-9 rounded-xl bg-cream/90 backdrop-blur border-2 border-wood/40 text-wood-dark font-bold shadow hover:bg-cream flex items-center justify-center cursor-pointer" title="Alejar">−</button>
+            <button onclick="resetCamera()" class="px-2.5 h-9 rounded-xl bg-cream/90 backdrop-blur border-2 border-wood/40 text-wood-dark text-xs font-bold shadow hover:bg-cream flex items-center justify-center cursor-pointer" title="Centrar vista">Centrar</button>
+            <button onclick="toggleFullscreenVillage()" id="fullscreenBtn" class="w-9 h-9 rounded-xl bg-wood text-cream border-2 border-wood-dark shadow hover:bg-wood-dark flex items-center justify-center cursor-pointer" title="Modo Solo Pueblo / Pantalla Completa">
+              <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8V4m0 0h4M3 4l4 4m8 0V4m0 0h-4m4 0l-4 4m-8 4v4m0 0h4m-4 0l4-4m8 4l-4-4m4 4v-4m0 4h-4"/></svg>
+            </button>
+          </div>
+
+          <!-- Future Preview Mode Banner -->
+          <div id="previewBanner" class="hidden absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-gold-light/95 border-2 border-wood-dark text-wood-dark px-4 py-1.5 rounded-2xl shadow-lg flex items-center gap-3 text-xs font-bold">
+            <span>Modo Paseo por el Futuro: viendo pueblo a <strong id="previewHoursLabel">300h</strong></span>
+            <button onclick="toggleFuturePreview(false)" class="bg-wood-dark text-cream px-2.5 py-0.5 rounded-lg hover:bg-wood cursor-pointer">Volver a mi progreso real</button>
+          </div>
+
+          <!-- Bottom-Left Interactive Hint & Next Milestone Mini-Bar -->
+          <div class="absolute bottom-3 left-3 right-3 flex flex-wrap items-end justify-between gap-2 pointer-events-none z-10">
+            <div class="bg-cream/90 backdrop-blur-md border border-wood/30 rounded-2xl px-3.5 py-2 shadow-md pointer-events-auto max-w-md">
+              <div class="flex items-center justify-between gap-4 text-xs font-bold text-wood-dark mb-1">
+                <span id="canvasNextMilestoneTitle">Siguiente: Buzón y Sendero (0.5 h)</span>
+                <span id="canvasNextMilestonePct" class="text-sage-deep">0%</span>
+              </div>
+              <div class="w-full h-2.5 bg-cream-beige rounded-full overflow-hidden border border-wood/20">
+                <div id="canvasNextMilestoneBar" class="h-full bg-gradient-to-r from-sage to-gold rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+              <p class="text-[11px] text-wood-light mt-1">Arrastra para explorar · Toca edificios, perritos o vecinos para interactuar 🐶</p>
+            </div>
+
+            <!-- Quick Future Tour Toggle -->
+            <div class="pointer-events-auto flex items-center gap-2">
+              <button onclick="toggleFuturePreview()" id="btnTogglePreview" class="bg-cream/90 backdrop-blur-md border-2 border-wood/40 hover:border-gold text-wood-dark px-3 py-1.5 rounded-2xl text-xs font-bold shadow-md transition cursor-pointer">
+                Explorar Pueblo Futuro
+              </button>
+            </div>
+          </div>
+
+          <!-- Interactive Entity Popover Card -->
+          <div id="entityPopover" class="hidden absolute z-30 max-w-xs w-72 bg-cream/98 backdrop-blur-md border-2 border-wood rounded-2xl p-3.5 shadow-xl animate-pop">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <span id="popoverBadge" class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-sage-light/50 text-sage-deep mb-1">Edificio · 3.0 h</span>
+                <h4 id="popoverTitle" class="font-display font-bold text-base text-wood-dark leading-snug">Cafetería El Grano Dorado</h4>
+              </div>
+              <button onclick="closePopover()" class="text-wood-light hover:text-wood-dark font-bold text-lg leading-none px-1 cursor-pointer">&times;</button>
+            </div>
+            <p id="popoverDesc" class="text-xs text-wood mt-1.5 leading-relaxed">Un rincón cálido con aroma a café recién molido donde repasar apuntes de Fisiología.</p>
+            <div id="popoverExtra" class="mt-2.5 pt-2 border-t border-cream-beige text-xs font-semibold text-sage-deep"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT SIDEBAR: STUDY TIMER & DAILY PROGRESS (4 cols) -->
+      <div class="lg:col-span-4 flex flex-col gap-4">
+        
+        <!-- TIMER CARD -->
+        <div class="cozy-card p-4 sm:p-5 flex flex-col gap-4 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 bg-cream-warm p-1 rounded-xl border border-cream-beige">
+              <button onclick="setTimerMode('stopwatch')" id="modeStopwatchBtn" class="px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer bg-wood text-cream">Cronómetro</button>
+              <button onclick="setTimerMode('pomodoro')" id="modePomodoroBtn" class="px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer text-wood-dark hover:bg-cream-beige/60">Pomodoro</button>
+            </div>
+            <span id="timerStatusBadge" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-cream-warm text-wood border border-cream-beige">En pausa</span>
+          </div>
+
+          <!-- Pomodoro Presets -->
+          <div id="pomodoroConfigRow" class="hidden flex items-center justify-between gap-2 bg-cream-warm/80 px-3 py-2 rounded-xl border border-cream-beige text-xs">
+            <span class="font-bold text-wood-dark">Duración:</span>
+            <div class="flex items-center gap-1.5">
+              <button onclick="setPomodoroMinutes(25)" class="pomo-preset px-2.5 py-1 rounded-lg font-bold bg-sage-dark text-cream cursor-pointer">25m</button>
+              <button onclick="setPomodoroMinutes(50)" class="pomo-preset px-2.5 py-1 rounded-lg font-bold bg-cream text-wood-dark border border-cream-beige cursor-pointer">50m</button>
+              <button onclick="setPomodoroMinutes(90)" class="pomo-preset px-2.5 py-1 rounded-lg font-bold bg-cream text-wood-dark border border-cream-beige cursor-pointer">90m</button>
+            </div>
+          </div>
+
+          <!-- Main Clock Display -->
+          <div class="bg-gradient-to-b from-cream-warm to-cream-beige/60 border-2 border-cream-beige rounded-2xl py-5 px-4 text-center shadow-inner relative">
+            <div id="timerDisplay" class="font-display font-bold text-4xl sm:text-5xl tracking-wider text-wood-dark tabular-nums">00:00:00</div>
+            <p id="timerActiveSubjectHint" class="text-xs font-semibold text-sage-deep mt-1.5">Cada minuto construye tu pueblo</p>
+          </div>
+
+          <!-- Subject Selector -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex items-center justify-between">
+              <label for="subjectSelect" class="text-xs font-bold text-wood-dark uppercase tracking-wider">Asignatura de Medicina</label>
+              <button onclick="openSubjectModal()" class="text-xs font-bold text-sage-deep hover:underline cursor-pointer">+ Gestionar asignaturas</button>
+            </div>
+            <div class="relative">
+              <select id="subjectSelect" onchange="onSubjectChange()" class="w-full appearance-none bg-cream-warm border-2 border-cream-beige focus:border-sage-dark rounded-xl px-3.5 py-2.5 text-sm font-bold text-wood-dark outline-none cursor-pointer pr-9">
+              </select>
+              <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-wood">
+                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Timer Control Buttons -->
+          <div class="grid grid-cols-2 gap-2.5 pt-1">
+            <button id="btnStartPause" onclick="toggleTimer()" class="btn-cozy col-span-2 py-3 px-4 rounded-2xl bg-sage-dark hover:bg-sage-deep text-cream font-bold text-base shadow-wood flex items-center justify-center gap-2 cursor-pointer">
+              <svg id="iconPlay" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+              <svg id="iconPause" class="w-5 h-5 hidden" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+              <span id="btnStartPauseText">Iniciar Estudio</span>
+            </button>
+
+            <button id="btnFinishSession" onclick="finishCurrentSession()" disabled class="btn-cozy py-2.5 px-3 rounded-xl bg-gold hover:bg-gold-dark disabled:opacity-45 disabled:pointer-events-none text-white font-bold text-xs sm:text-sm shadow-woodSm flex items-center justify-center gap-1.5 cursor-pointer">
+              <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              <span>Guardar Sesión</span>
+            </button>
+
+            <button id="btnDiscardSession" onclick="confirmDiscardSession()" disabled class="btn-cozy py-2.5 px-3 rounded-xl bg-cream-warm hover:bg-pastel-pink/30 disabled:opacity-45 disabled:pointer-events-none text-wood-dark border border-cream-beige font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer">
+              <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+              <span>Descartar</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- DAILY GOAL & SUMMARY CARD -->
+        <div class="cozy-card p-4 sm:p-5 flex flex-col gap-3.5">
+          <div class="flex items-center justify-between">
+            <h3 class="font-display font-bold text-base text-wood-dark">Progreso Diario y Resumen</h3>
+            <button onclick="openDailyGoalEditor()" class="text-xs font-bold text-wood hover:text-sage-deep bg-cream-warm px-2.5 py-1 rounded-lg border border-cream-beige cursor-pointer">
+              Meta: <span id="dailyGoalLabel">4.0 h</span>
+            </button>
+          </div>
+
+          <!-- Daily Goal Progress Bar -->
+          <div>
+            <div class="flex justify-between text-xs font-bold mb-1">
+              <span class="text-wood">Hoy: <strong id="summaryToday" class="text-wood-dark">0h 00m</strong></span>
+              <span id="dailyGoalPct" class="text-sage-deep">0%</span>
+            </div>
+            <div class="w-full h-3 bg-cream-warm rounded-full overflow-hidden border border-cream-beige">
+              <div id="dailyGoalBar" class="h-full bg-gradient-to-r from-pastel-blue-dark via-sage to-gold rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- 4 Summary Metrics Grid -->
+          <div class="grid grid-cols-2 gap-2.5 pt-1">
+            <div class="bg-cream-warm/90 border border-cream-beige rounded-xl p-2.5">
+              <span class="text-[11px] font-bold text-wood-light block">Esta Semana</span>
+              <span id="summaryWeek" class="font-display font-bold text-base text-wood-dark">0h 00m</span>
+            </div>
+            <div class="bg-cream-warm/90 border border-cream-beige rounded-xl p-2.5">
+              <span class="text-[11px] font-bold text-wood-light block">Este Mes</span>
+              <span id="summaryMonth" class="font-display font-bold text-base text-wood-dark">0h 00m</span>
+            </div>
+            <div class="bg-cream-warm/90 border border-cream-beige rounded-xl p-2.5">
+              <span class="text-[11px] font-bold text-wood-light block">Total Acumulado</span>
+              <span id="summaryTotal" class="font-display font-bold text-base text-sage-deep">0h 00m</span>
+            </div>
+            <div class="bg-cream-warm/90 border border-cream-beige rounded-xl p-2.5">
+              <span class="text-[11px] font-bold text-wood-light block">Próximo Hito</span>
+              <span id="summaryNextHours" class="font-display font-bold text-base text-gold-dark">0.5 h</span>
+            </div>
+          </div>
+
+          <!-- Quick Add Manual Session Button -->
+          <button onclick="openManualSessionModal()" class="w-full py-2 px-3 rounded-xl bg-cream-warm hover:bg-cream-beige/70 border border-cream-beige text-wood-dark font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer">
+            <span>+ Añadir sesión manual olvidada</span>
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 2: DIARIO DE SESIONES -->
+    <section id="tab-sesiones" class="tab-content hidden flex-col gap-5">
+      <div class="cozy-card p-5 sm:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-5">
+          <div>
+            <h2 class="font-display font-bold text-2xl text-wood-dark">Cuaderno de Estudio</h2>
+            <p class="text-sm text-wood">Cada sesión registrada queda guardada en la historia de tu pueblo.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <select id="filterSubjectSelect" onchange="renderSessionsList()" class="bg-cream-warm border-2 border-cream-beige rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-wood-dark outline-none cursor-pointer">
+              <option value="ALL">Todas las asignaturas</option>
+            </select>
+            <button onclick="openManualSessionModal()" class="btn-cozy px-4 py-2 rounded-xl bg-sage-dark text-cream font-bold text-xs sm:text-sm shadow-woodSm cursor-pointer">
+              + Registrar Sesión Manual
+            </button>
+          </div>
+        </div>
+
+        <div id="sessionsListContainer" class="flex flex-col gap-2.5">
+          <!-- Dinámico -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: ESTADÍSTICAS -->
+    <section id="tab-estadisticas" class="tab-content hidden flex-col gap-5">
+      <!-- Top KPI Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+        <div class="cozy-card p-4">
+          <span class="text-xs font-bold text-wood-light">Hoy</span>
+          <div id="statToday" class="font-display font-bold text-xl sm:text-2xl text-wood-dark mt-1">0.0 h</div>
+        </div>
+        <div class="cozy-card p-4">
+          <span class="text-xs font-bold text-wood-light">Esta Semana</span>
+          <div id="statWeek" class="font-display font-bold text-xl sm:text-2xl text-wood-dark mt-1">0.0 h</div>
+        </div>
+        <div class="cozy-card p-4">
+          <span class="text-xs font-bold text-wood-light">Este Mes</span>
+          <div id="statMonth" class="font-display font-bold text-xl sm:text-2xl text-wood-dark mt-1">0.0 h</div>
+        </div>
+        <div class="cozy-card p-4">
+          <span class="text-xs font-bold text-wood-light">Total Histórico</span>
+          <div id="statTotal" class="font-display font-bold text-xl sm:text-2xl text-sage-deep mt-1">0.0 h</div>
+        </div>
+        <div class="cozy-card p-4">
+          <span class="text-xs font-bold text-wood-light">Racha Actual</span>
+          <div id="statStreak" class="font-display font-bold text-xl sm:text-2xl text-gold-dark mt-1">0 días</div>
+        </div>
+        <div class="cozy-card p-4">
+          <span class="text-xs font-bold text-wood-light">Récord de Racha</span>
+          <div id="statBestStreak" class="font-display font-bold text-xl sm:text-2xl text-wood-dark mt-1">0 días</div>
+        </div>
+      </div>
+
+      <!-- Next Milestone Progress Card -->
+      <div class="cozy-card p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-sage-deep">Próxima Construcción del Pueblo</span>
+            <h3 id="statNextBuildingName" class="font-display font-bold text-lg text-wood-dark">Buzón y Sendero de Piedra</h3>
+          </div>
+          <div class="text-right">
+            <span id="statNextBuildingPct" class="font-display font-bold text-xl text-gold-dark">0%</span>
+            <p id="statNextBuildingRemaining" class="text-xs font-semibold text-wood">Faltan 30 min</p>
+          </div>
+        </div>
+        <div class="w-full h-4 bg-cream-warm rounded-full overflow-hidden border border-cream-beige p-0.5">
+          <div id="statNextBuildingBar" class="h-full bg-gradient-to-r from-sage via-pastel-blue-dark to-gold rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Activity Heatmap -->
+      <div class="cozy-card p-5">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div>
+            <h3 class="font-display font-bold text-lg text-wood-dark">Calendario de Constancia (Últimos 6 meses)</h3>
+            <p class="text-xs text-wood">Cada cuadro representa un día de estudio en tu camino hacia la Medicina.</p>
+          </div>
+          <div class="flex items-center gap-1.5 text-[11px] font-bold text-wood">
+            <span>Menos</span>
+            <span class="w-3.5 h-3.5 rounded bg-cream-beige border border-wood/15"></span>
+            <span class="w-3.5 h-3.5 rounded bg-sage-light"></span>
+            <span class="w-3.5 h-3.5 rounded bg-sage"></span>
+            <span class="w-3.5 h-3.5 rounded bg-sage-dark"></span>
+            <span class="w-3.5 h-3.5 rounded bg-gold"></span>
+            <span>Más</span>
+          </div>
+        </div>
+        <div class="overflow-x-auto pb-2">
+          <div id="activityHeatmap" class="inline-grid grid-flow-col grid-rows-7 gap-1.5 min-w-max"></div>
+        </div>
+        <p id="heatmapHoverInfo" class="text-xs font-semibold text-sage-deep mt-2 h-4">Pasa el ratón o toca un día para ver las horas estudiadas.</p>
+      </div>
+
+      <!-- Charts Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div class="lg:col-span-7 cozy-card p-5 flex flex-col">
+          <h3 class="font-display font-bold text-lg text-wood-dark mb-1">Horas por Semana (Últimas 10 semanas)</h3>
+          <p class="text-xs text-wood mb-4">Evolución semanal de tu ritmo de estudio.</p>
+          <div class="w-full h-64 relative">
+            <canvas id="weeklyChartCanvas"></canvas>
+          </div>
+        </div>
+
+        <div class="lg:col-span-5 cozy-card p-5 flex flex-col">
+          <h3 class="font-display font-bold text-lg text-wood-dark mb-1">Distribución por Asignatura</h3>
+          <p class="text-xs text-wood mb-4">Tiempo acumulado en cada materia.</p>
+          <div class="flex flex-col sm:flex-row items-center gap-4 flex-1">
+            <div class="w-44 h-44 shrink-0 relative">
+              <canvas id="subjectDonutCanvas"></canvas>
+            </div>
+            <div id="subjectBreakdownList" class="flex-1 w-full flex flex-col gap-2 max-h-56 overflow-y-auto pr-1">
+              <!-- Dinámico -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: COLECCIÓN DE EDIFICIOS -->
+    <section id="tab-coleccion" class="tab-content hidden flex-col gap-5">
+      <div class="cozy-card p-5 sm:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <div>
+            <h2 class="font-display font-bold text-2xl text-wood-dark">Crónica Arquitectónica del Pueblo</h2>
+            <p class="text-sm text-wood">25 hitos desde tu primera cabaña hasta una vibrante Ciudad Universitaria (0 h – 300 h).</p>
+          </div>
+          <div class="bg-cream-warm border border-cream-beige px-4 py-2 rounded-2xl text-xs font-bold text-wood-dark">
+            Desbloqueados: <span id="unlockedCountBadge" class="text-sage-deep text-sm">1 / 25</span>
+          </div>
+        </div>
+
+        <div id="milestonesGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <!-- Dinámico -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: PERSONALIZACIÓN -->
+    <section id="tab-personalizacion" class="tab-content hidden flex-col gap-5">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        
+        <div class="lg:col-span-7 flex flex-col gap-5">
+          <div class="cozy-card p-5 sm:p-6 flex flex-col gap-4">
+            <h2 class="font-display font-bold text-xl text-wood-dark">Identidad y Estética del Pueblo</h2>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-wood-dark uppercase mb-1.5">Nombre de tu Pueblo</label>
+                <div class="flex gap-2">
+                  <input type="text" id="villageNameInput" maxlength="32" class="flex-1 bg-cream-warm border-2 border-cream-beige focus:border-sage-dark rounded-xl px-3.5 py-2 text-sm font-bold text-wood-dark outline-none" />
+                  <button onclick="saveVillageName()" class="btn-cozy px-4 py-2 rounded-xl bg-sage-dark text-cream font-bold text-xs shadow-woodSm cursor-pointer">Guardar</button>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-wood-dark uppercase mb-1.5">Objetivo Diario (Horas)</label>
+                <div class="flex gap-2">
+                  <input type="number" id="dailyGoalInput" min="0.5" max="16" step="0.5" class="flex-1 bg-cream-warm border-2 border-cream-beige focus:border-sage-dark rounded-xl px-3.5 py-2 text-sm font-bold text-wood-dark outline-none" />
+                  <button onclick="saveDailyGoal()" class="btn-cozy px-4 py-2 rounded-xl bg-sage-dark text-cream font-bold text-xs shadow-woodSm cursor-pointer">Aplicar</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Estilo arquitectónico -->
+            <div>
+              <label class="block text-xs font-bold text-wood-dark uppercase mb-2">Estilo de Tejados y Fachadas de Piedra</label>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5" id="styleSelectorGrid">
+                <button onclick="setBuildingStyle('cottagecore')" data-style="cottagecore" class="style-card p-3 rounded-2xl border-2 text-left transition cursor-pointer">
+                  <div class="flex gap-1 mb-1.5">
+                    <span class="w-4 h-4 rounded-full bg-[#C97B63]"></span>
+                    <span class="w-4 h-4 rounded-full bg-[#FAF6EE] border border-wood/20"></span>
+                    <span class="w-4 h-4 rounded-full bg-[#8FA893]"></span>
+                  </div>
+                  <div class="font-bold text-xs text-wood-dark">Cottagecore</div>
+                  <div class="text-[11px] text-wood">Terracota y musgo</div>
+                </button>
+                <button onclick="setBuildingStyle('alpine')" data-style="alpine" class="style-card p-3 rounded-2xl border-2 text-left transition cursor-pointer">
+                  <div class="flex gap-1 mb-1.5">
+                    <span class="w-4 h-4 rounded-full bg-[#6E4730]"></span>
+                    <span class="w-4 h-4 rounded-full bg-[#D7C0A3]"></span>
+                    <span class="w-4 h-4 rounded-full bg-[#5C7A64]"></span>
+                  </div>
+                  <div class="font-bold text-xs text-wood-dark">Alpino Cálido</div>
+                  <div class="text-[11px] text-wood">Madera noble y pino</div>
+                </button>
+                <button onclick="setBuildingStyle('mediterranean')" data-style="mediterranean" class="style-card p-3 rounded-2xl border-2 text-left transition cursor-pointer">
+                  <div class="flex gap-1 mb-1.5">
+                    <span class="w-4 h-4 rounded-full bg-[#D98A6C]"></span>
+                    <span class="w-4 h-4 rounded-full bg-[#FFFDF9] border border-wood/20"></span>
+                    <span class="w-4 h-4 rounded-full bg-[#7EA8BE]"></span>
+                  </div>
+                  <div class="font-bold text-xs text-wood-dark">Mediterráneo</div>
+                  <div class="text-[11px] text-wood">Cal blanca y azul</div>
+                </button>
+                <button onclick="setBuildingStyle('fairytale')" data-style="fairytale" class="style-card p-3 rounded-2xl border-2 text-left transition cursor-pointer">
+                  <div class="flex gap-1 mb-1.5">
+                    <span class="w-4 h-4 rounded-full bg-[#D198A4]"></span>
+                    <span class="w-4 h-4 rounded-full bg-[#F6EFE6]"></span>
+                    <span class="w-4 h-4 rounded-full bg-[#D4A359]"></span>
+                  </div>
+                  <div class="font-bold text-xs text-wood-dark">Cuento Pastel</div>
+                  <div class="text-[11px] text-wood">Rosa empolvado y oro</div>
+                </button>
+              </div>
+            </div>
+
+            <!-- Estación -->
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-cream-warm p-3.5 rounded-2xl border border-cream-beige">
+              <div>
+                <div class="font-bold text-sm text-wood-dark">Estación del Año</div>
+                <div class="text-xs text-wood">Elige el ambiente estacional o sincronízalo con el calendario real.</div>
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <button onclick="setSeason('spring')" class="px-3 py-1.5 rounded-xl bg-cream border border-cream-beige text-xs font-bold hover:bg-pastel-pink/30 cursor-pointer">Primavera</button>
+                <button onclick="setSeason('summer')" class="px-3 py-1.5 rounded-xl bg-cream border border-cream-beige text-xs font-bold hover:bg-sage-light/40 cursor-pointer">Verano</button>
+                <button onclick="setSeason('autumn')" class="px-3 py-1.5 rounded-xl bg-cream border border-cream-beige text-xs font-bold hover:bg-gold-light/40 cursor-pointer">Otoño</button>
+                <button onclick="setSeason('winter')" class="px-3 py-1.5 rounded-xl bg-cream border border-cream-beige text-xs font-bold hover:bg-pastel-blue/40 cursor-pointer">Invierno</button>
+                <button onclick="syncRealSeason()" class="px-3 py-1.5 rounded-xl bg-sage-dark text-cream text-xs font-bold cursor-pointer">Auto (Real)</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Decoraciones -->
+          <div class="cozy-card p-5 sm:p-6">
+            <h3 class="font-display font-bold text-lg text-wood-dark mb-1">Decoraciones Especiales y Fauna</h3>
+            <p class="text-xs text-wood mb-4">Perritos, gatitos, farolas y mariposas que van llegando a tu pueblo.</p>
+            <div id="decorationsList" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <!-- Dinámico -->
+            </div>
+          </div>
+
+          <!-- Backup -->
+          <div class="cozy-card p-5 sm:p-6 flex flex-col gap-3">
+            <h3 class="font-display font-bold text-lg text-wood-dark">Copia de Seguridad y Herramientas</h3>
+            <p class="text-xs text-wood">Todos tus datos se guardan en el navegador. Exporta una copia periódicamente.</p>
+            <div class="flex flex-wrap gap-2.5 pt-1">
+              <button onclick="exportDataJSON()" class="btn-cozy px-4 py-2 rounded-xl bg-wood text-cream font-bold text-xs shadow-woodSm cursor-pointer">Exportar Copia (.json)</button>
+              <label class="btn-cozy px-4 py-2 rounded-xl bg-cream-warm border border-wood text-wood-dark font-bold text-xs cursor-pointer">
+                Importar Copia (.json)
+                <input type="file" accept=".json" onchange="importDataJSON(event)" class="hidden" />
+              </label>
+              <button onclick="downloadStandaloneHTML()" class="btn-cozy px-4 py-2 rounded-xl bg-gold text-white font-bold text-xs shadow-woodSm cursor-pointer">Descargar App (.html)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aldeanos -->
+        <div class="lg:col-span-5 cozy-card p-5 sm:p-6 flex flex-col">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="font-display font-bold text-xl text-wood-dark">Habitantes del Pueblo</h2>
+            <span id="villagerCountBadge" class="px-2.5 py-1 rounded-full bg-sage-light/40 text-sage-deep text-xs font-bold">1 vecino</span>
+          </div>
+          <p class="text-xs text-wood mb-4">Vecinos y estudiantes que llegan al pueblo a medida que desbloqueas edificios. Puedes cambiar sus nombres.</p>
+          <div id="villagersRosterList" class="flex flex-col gap-2.5 overflow-y-auto max-h-[580px] pr-1">
+            <!-- Dinámico -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: CELEBRATION -->
+  <div id="celebrationModal" class="hidden fixed inset-0 z-50 bg-wood-dark/55 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-cream border-4 border-gold rounded-3xl max-w-md w-full p-6 text-center shadow-2xl animate-pop relative overflow-hidden">
+      <div class="inline-block px-3 py-1 rounded-full bg-gold-light/40 border border-gold text-wood-dark font-bold text-xs uppercase tracking-wider mb-3">
+        ¡Nuevo Hito Alcanzado!
+      </div>
+      <div id="celebrationPreviewArt" class="w-28 h-28 mx-auto my-2 rounded-2xl bg-sage-light/30 border-2 border-sage flex items-center justify-center">
+        <canvas id="celebrationMiniCanvas" width="112" height="112"></canvas>
+      </div>
+      <h3 id="celebrationTitle" class="font-display font-bold text-2xl text-wood-dark mt-2">¡Cafetería Desbloqueada!</h3>
+      <p id="celebrationDesc" class="text-sm text-wood mt-2 leading-relaxed">Tu constancia ha dado vida a un nuevo rincón en el pueblo.</p>
+      <div id="celebrationVillagerBox" class="mt-4 bg-cream-warm border border-cream-beige rounded-2xl p-3 text-xs font-semibold text-sage-deep">
+        Nuevo habitante: Clara
+      </div>
+      <button onclick="closeCelebrationModal()" class="btn-cozy mt-5 w-full py-3 rounded-2xl bg-sage-dark hover:bg-sage-deep text-cream font-bold text-sm shadow-wood cursor-pointer">
+        ¡Ver en mi pueblo!
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL: MANUAL / EDIT SESSION -->
+  <div id="sessionModal" class="hidden fixed inset-0 z-50 bg-wood-dark/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-cream border-2 border-wood rounded-3xl max-w-md w-full p-6 shadow-2xl animate-pop">
+      <div class="flex items-center justify-between mb-4">
+        <h3 id="sessionModalTitle" class="font-display font-bold text-xl text-wood-dark">Registrar Sesión Manual</h3>
+        <button onclick="closeSessionModal()" class="text-wood-light hover:text-wood-dark text-2xl leading-none cursor-pointer">&times;</button>
+      </div>
+      <input type="hidden" id="editSessionId" value="" />
+      <div class="flex flex-col gap-3.5">
+        <div>
+          <label class="block text-xs font-bold text-wood-dark uppercase mb-1">Asignatura</label>
+          <select id="modalSubjectSelect" class="w-full bg-cream-warm border-2 border-cream-beige rounded-xl px-3 py-2 text-sm font-bold text-wood-dark outline-none"></select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-wood-dark uppercase mb-1">Horas</label>
+            <input type="number" id="modalHoursInput" min="0" max="24" value="1" class="w-full bg-cream-warm border-2 border-cream-beige rounded-xl px-3 py-2 text-sm font-bold text-wood-dark outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-wood-dark uppercase mb-1">Minutos</label>
+            <input type="number" id="modalMinutesInput" min="0" max="59" value="0" class="w-full bg-cream-warm border-2 border-cream-beige rounded-xl px-3 py-2 text-sm font-bold text-wood-dark outline-none" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-wood-dark uppercase mb-1">Fecha</label>
+          <input type="date" id="modalDateInput" class="w-full bg-cream-warm border-2 border-cream-beige rounded-xl px-3 py-2 text-sm font-bold text-wood-dark outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-wood-dark uppercase mb-1">Nota breve (opcional)</label>
+          <input type="text" id="modalNoteInput" placeholder="Ej. Tema 4: Pares craneales y repaso MIR" maxlength="80" class="w-full bg-cream-warm border-2 border-cream-beige rounded-xl px-3 py-2 text-sm font-medium text-wood-dark outline-none" />
+        </div>
+        <div class="flex gap-2.5 pt-2">
+          <button onclick="closeSessionModal()" class="flex-1 py-2.5 rounded-xl bg-cream-warm border border-cream-beige font-bold text-xs text-wood-dark cursor-pointer">Cancelar</button>
+          <button onclick="saveManualOrEditedSession()" class="btn-cozy flex-1 py-2.5 rounded-xl bg-sage-dark text-cream font-bold text-xs shadow-woodSm cursor-pointer">Guardar Sesión</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MANAGE SUBJECTS -->
+  <div id="subjectModal" class="hidden fixed inset-0 z-50 bg-wood-dark/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-cream border-2 border-wood rounded-3xl max-w-md w-full p-6 shadow-2xl animate-pop">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-display font-bold text-xl text-wood-dark">Asignaturas de Medicina</h3>
+        <button onclick="closeSubjectModal()" class="text-wood-light hover:text-wood-dark text-2xl leading-none cursor-pointer">&times;</button>
+      </div>
+      <div class="flex gap-2 mb-4">
+        <input type="text" id="newSubjectName" placeholder="Nueva asignatura..." maxlength="36" class="flex-1 bg-cream-warm border-2 border-cream-beige rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-wood-dark outline-none" />
+        <input type="color" id="newSubjectColor" value="#8FA893" class="w-10 h-10 rounded-xl border-2 border-cream-beige cursor-pointer bg-transparent" />
+        <button onclick="addNewSubject()" class="btn-cozy px-3.5 py-2 rounded-xl bg-sage-dark text-cream font-bold text-xs shadow-woodSm cursor-pointer">Añadir</button>
+      </div>
+      <div id="subjectManagerList" class="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1">
+        <!-- Dinámico -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: COZY CONFIRM -->
+  <div id="cozyConfirmModal" class="hidden fixed inset-0 z-50 bg-wood-dark/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-cream border-2 border-wood rounded-3xl max-w-sm w-full p-5 shadow-2xl animate-pop text-center">
+      <h4 id="cozyConfirmTitle" class="font-display font-bold text-lg text-wood-dark mb-1.5">¿Confirmar acción?</h4>
+      <p id="cozyConfirmMsg" class="text-xs text-wood mb-4">Esta acción actualizará tu registro.</p>
+      <div class="flex gap-2.5">
+        <button onclick="resolveCozyConfirm(false)" class="flex-1 py-2 rounded-xl bg-cream-warm border border-cream-beige font-bold text-xs text-wood-dark cursor-pointer">Cancelar</button>
+        <button onclick="resolveCozyConfirm(true)" class="btn-cozy flex-1 py-2 rounded-xl bg-wood text-cream font-bold text-xs shadow-woodSm cursor-pointer">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- SCRIPTS MODULARES PROFESIONALES -->
+  <script src="js/core/data.js"></script>
+  <script src="js/core/state.js"></script>
+  <script src="js/core/timer.js"></script>
+  <script src="js/village/renderer.js"></script>
+  <script src="js/ui/modals.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
