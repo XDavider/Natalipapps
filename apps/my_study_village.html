@@ -8,7 +8,7 @@
   <!-- Tipografías Cozy & Lofi -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet" />
   
   <!-- Tailwind CSS CDN con paleta Cozy personalizada -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -46,8 +46,8 @@
             }
           },
           fontFamily: {
-            display: ['Fraunces', 'Georgia', 'serif'],
-            sans: ['Quicksand', 'system-ui', '-apple-system', 'sans-serif']
+            display: ['Fredoka', 'Nunito', 'sans-serif'],
+            sans: ['Nunito', 'Quicksand', 'system-ui', '-apple-system', 'sans-serif']
           },
           boxShadow: {
             cozy: '0 8px 24px -4px rgba(92, 62, 43, 0.12), 0 2px 6px -1px rgba(92, 62, 43, 0.08)',
@@ -155,63 +155,63 @@
 
           <!-- Top-Left Floating HUD: Season, Time of Day & Preview Mode -->
           <div class="absolute top-3 left-3 flex flex-wrap items-center gap-2 z-10 pointer-events-auto">
-            <div class="bg-cream/90 backdrop-blur-md border-2 border-wood/40 rounded-2xl px-2.5 py-1 shadow-md flex items-center gap-1">
-              <button onclick="setSeason('spring')" id="btnSeason-spring" class="season-pill px-2 py-0.5 rounded-xl text-xs font-bold transition cursor-pointer" title="Primavera">Primavera</button>
-              <button onclick="setSeason('summer')" id="btnSeason-summer" class="season-pill px-2 py-0.5 rounded-xl text-xs font-bold transition cursor-pointer" title="Verano">Verano</button>
-              <button onclick="setSeason('autumn')" id="btnSeason-autumn" class="season-pill px-2 py-0.5 rounded-xl text-xs font-bold transition cursor-pointer" title="Otoño">Otoño</button>
-              <button onclick="setSeason('winter')" id="btnSeason-winter" class="season-pill px-2 py-0.5 rounded-xl text-xs font-bold transition cursor-pointer" title="Invierno">Invierno</button>
+            <div class="hud-dock rounded-full px-2 py-1 flex items-center gap-1">
+              <button onclick="setSeason('spring')" id="btnSeason-spring" class="season-pill px-2.5 py-0.5 rounded-full text-xs font-bold transition cursor-pointer" title="Primavera">Primavera</button>
+              <button onclick="setSeason('summer')" id="btnSeason-summer" class="season-pill px-2.5 py-0.5 rounded-full text-xs font-bold transition cursor-pointer" title="Verano">Verano</button>
+              <button onclick="setSeason('autumn')" id="btnSeason-autumn" class="season-pill px-2.5 py-0.5 rounded-full text-xs font-bold transition cursor-pointer" title="Otoño">Otoño</button>
+              <button onclick="setSeason('winter')" id="btnSeason-winter" class="season-pill px-2.5 py-0.5 rounded-full text-xs font-bold transition cursor-pointer" title="Invierno">Invierno</button>
             </div>
 
-            <button onclick="cycleTimeOfDay()" id="timeOfDayBtn" class="bg-cream/90 backdrop-blur-md border-2 border-wood/40 rounded-2xl px-3 py-1 shadow-md text-xs font-bold text-wood-dark hover:bg-cream transition flex items-center gap-1.5 cursor-pointer" title="Cambiar iluminación del cielo">
+            <button onclick="cycleTimeOfDay()" id="timeOfDayBtn" class="hud-pill-btn rounded-full px-3.5 py-1.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer" title="Cambiar iluminación del cielo">
               <span id="timeOfDayLabel">Luz: Auto</span>
             </button>
           </div>
 
           <!-- Top-Right Floating Controls: Zoom, Center, Fullscreen -->
           <div class="absolute top-3 right-3 flex items-center gap-1.5 z-10">
-            <button onclick="zoomVillage(0.15)" class="w-9 h-9 rounded-xl bg-cream/90 backdrop-blur border-2 border-wood/40 text-wood-dark font-bold shadow hover:bg-cream flex items-center justify-center cursor-pointer" title="Acercar">+</button>
-            <button onclick="zoomVillage(-0.15)" class="w-9 h-9 rounded-xl bg-cream/90 backdrop-blur border-2 border-wood/40 text-wood-dark font-bold shadow hover:bg-cream flex items-center justify-center cursor-pointer" title="Alejar">−</button>
-            <button onclick="resetCamera()" class="px-2.5 h-9 rounded-xl bg-cream/90 backdrop-blur border-2 border-wood/40 text-wood-dark text-xs font-bold shadow hover:bg-cream flex items-center justify-center cursor-pointer" title="Centrar vista">Centrar</button>
-            <button onclick="toggleFullscreenVillage()" id="fullscreenBtn" class="w-9 h-9 rounded-xl bg-wood text-cream border-2 border-wood-dark shadow hover:bg-wood-dark flex items-center justify-center cursor-pointer" title="Modo Solo Pueblo / Pantalla Completa">
+            <button onclick="zoomVillage(0.15)" class="hud-pill-btn w-9 h-9 rounded-full font-extrabold text-base flex items-center justify-center cursor-pointer" title="Acercar">+</button>
+            <button onclick="zoomVillage(-0.15)" class="hud-pill-btn w-9 h-9 rounded-full font-extrabold text-base flex items-center justify-center cursor-pointer" title="Alejar">−</button>
+            <button onclick="resetCamera()" class="hud-pill-btn px-3.5 h-9 rounded-full text-xs font-bold flex items-center justify-center cursor-pointer" title="Centrar vista">Centrar</button>
+            <button onclick="toggleFullscreenVillage()" id="fullscreenBtn" class="hud-pill-btn hud-pill-wood w-9 h-9 rounded-full flex items-center justify-center cursor-pointer" title="Modo Solo Pueblo / Pantalla Completa">
               <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8V4m0 0h4M3 4l4 4m8 0V4m0 0h-4m4 0l-4 4m-8 4v4m0 0h4m-4 0l4-4m8 4l-4-4m4 4v-4m0 4h-4"/></svg>
             </button>
           </div>
 
           <!-- Future Preview Mode Banner -->
-          <div id="previewBanner" class="hidden absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-gold-light/95 border-2 border-wood-dark text-wood-dark px-4 py-1.5 rounded-2xl shadow-lg flex items-center gap-3 text-xs font-bold">
+          <div id="previewBanner" class="hidden hud-preview-banner absolute top-16 left-1/2 -translate-x-1/2 z-20 px-4 py-1.5 rounded-full flex items-center gap-3 text-xs font-bold">
             <span>Modo Paseo por el Futuro: viendo pueblo a <strong id="previewHoursLabel">300h</strong></span>
-            <button onclick="toggleFuturePreview(false)" class="bg-wood-dark text-cream px-2.5 py-0.5 rounded-lg hover:bg-wood cursor-pointer">Volver a mi progreso real</button>
+            <button onclick="toggleFuturePreview(false)" class="hud-preview-exit px-3 py-1 rounded-full cursor-pointer">Volver a mi progreso real</button>
           </div>
 
           <!-- Bottom-Left Interactive Hint & Next Milestone Mini-Bar -->
           <div class="absolute bottom-3 left-3 right-3 flex flex-wrap items-end justify-between gap-2 pointer-events-none z-10">
-            <div class="bg-cream/90 backdrop-blur-md border border-wood/30 rounded-2xl px-3.5 py-2 shadow-md pointer-events-auto max-w-md">
-              <div class="flex items-center justify-between gap-4 text-xs font-bold text-wood-dark mb-1">
+            <div class="hud-mission-card rounded-2xl px-4 py-2.5 pointer-events-auto max-w-md">
+              <div class="flex items-center justify-between gap-4 text-xs font-bold text-wood-dark mb-1.5">
                 <span id="canvasNextMilestoneTitle">Siguiente: Buzón y Sendero (0.5 h)</span>
-                <span id="canvasNextMilestonePct" class="text-sage-deep">0%</span>
+                <span id="canvasNextMilestonePct" class="hud-mission-pct px-2 py-0.5 rounded-full">0%</span>
               </div>
-              <div class="w-full h-2.5 bg-cream-beige rounded-full overflow-hidden border border-wood/20">
-                <div id="canvasNextMilestoneBar" class="h-full bg-gradient-to-r from-sage to-gold rounded-full transition-all duration-500" style="width: 0%"></div>
+              <div class="hud-progress-track w-full h-3 rounded-full overflow-hidden">
+                <div id="canvasNextMilestoneBar" class="hud-progress-fill h-full rounded-full transition-all duration-500" style="width: 0%"></div>
               </div>
-              <p class="text-[11px] text-wood-light mt-1">Arrastra para rotar · Rueda para zoom · Toca edificios, perritos o vecinos 🐶</p>
+              <p class="text-[11px] text-wood mt-1.5 font-semibold">Arrastra para rotar · Rueda para zoom · Toca edificios, perritos o vecinos 🐶</p>
             </div>
 
             <!-- Quick Future Tour Toggle -->
             <div class="pointer-events-auto flex items-center gap-2">
-              <button onclick="toggleFuturePreview()" id="btnTogglePreview" class="bg-cream/90 backdrop-blur-md border-2 border-wood/40 hover:border-gold text-wood-dark px-3 py-1.5 rounded-2xl text-xs font-bold shadow-md transition cursor-pointer">
+              <button onclick="toggleFuturePreview()" id="btnTogglePreview" class="hud-pill-btn px-4 py-2 rounded-full text-xs font-bold cursor-pointer">
                 Explorar Pueblo Futuro
               </button>
             </div>
           </div>
 
-          <!-- Hover 3D Tooltip -->
-          <div id="hoverTooltip3D" class="hidden absolute z-25 pointer-events-none px-3 py-1.5 rounded-xl bg-cream/95 border-2 border-wood/60 shadow-lg text-xs font-bold text-wood-dark whitespace-nowrap"></div>
+          <!-- Hover 3D Speech Tooltip -->
+          <div id="hoverTooltip3D" class="hidden cozy-speech-tooltip absolute z-25 pointer-events-none px-3.5 py-1.5 rounded-2xl text-xs font-bold whitespace-nowrap"></div>
 
-          <!-- Interactive Entity Popover Card -->
-          <div id="entityPopover" class="hidden absolute z-30 max-w-xs w-72 bg-cream/98 backdrop-blur-md border-2 border-wood rounded-2xl p-3.5 shadow-xl animate-pop">
+          <!-- Interactive Entity Popover Card (Animal Crossing Dialogue Bubble) -->
+          <div id="entityPopover" class="hidden cozy-speech-popover animate-pop">
             <div class="flex items-start justify-between gap-2">
               <div>
-                <span id="popoverBadge" class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-sage-light/50 text-sage-deep mb-1">Edificio · 3.0 h</span>
+                <span id="popoverBadge" class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-sage-light/55 text-sage-deep mb-1">Edificio · 3.0 h</span>
                 <h4 id="popoverTitle" class="font-display font-bold text-base text-wood-dark leading-snug">Cafetería El Grano Dorado</h4>
               </div>
               <button onclick="closePopover()" class="text-wood-light hover:text-wood-dark font-bold text-lg leading-none px-1 cursor-pointer">&times;</button>

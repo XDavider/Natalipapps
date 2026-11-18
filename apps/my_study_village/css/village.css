@@ -1,11 +1,14 @@
 /* ==========================================================================
-   My Study Village · Stylesheet (Cozy, Stardew Valley & Lofi aesthetics)
+   My Study Village · Stylesheet (Cozy Indie Game HUD & Animal Crossing Style)
    ========================================================================== */
 
 :root {
   --bg-cream: #FAF6EE;
   --bg-warm: #F3ECE0;
   --bg-beige: #E8DEC8;
+  --hud-parchment: #FFF9EE;
+  --hud-wood: #8C6239;
+  --hud-wood-soft: #A67C52;
   --wood: #7C5841;
   --wood-dark: #5C3E2B;
   --sage: #8FA893;
@@ -21,7 +24,7 @@
 }
 
 body {
-  font-family: 'Quicksand', system-ui, -apple-system, sans-serif;
+  font-family: 'Nunito', 'Quicksand', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-cream);
   color: var(--wood-dark);
   background-image:
@@ -32,8 +35,8 @@ body {
   overflow-x: hidden;
 }
 
-h1, h2, h3, .font-serif-cozy {
-  font-family: 'Fraunces', Georgia, serif;
+h1, h2, h3, h4, .font-display, .font-serif-cozy {
+  font-family: 'Fredoka', 'Nunito', sans-serif;
 }
 
 /* Cozy Scrollbars estilo cuaderno */
@@ -54,7 +57,7 @@ h1, h2, h3, .font-serif-cozy {
   background: #8FA893;
 }
 
-/* Botones táctiles estilo videojuego retro / cozy */
+/* Botones táctiles generales */
 .btn-cozy {
   transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.15s ease;
 }
@@ -65,31 +68,30 @@ h1, h2, h3, .font-serif-cozy {
 
 /* Cartel de madera tallada (Animal Crossing plaque) */
 .wooden-plaque {
-  background: linear-gradient(180deg, #8B644B 0%, #7C5841 100%);
-  border: 2px solid #5C3E2B;
-  box-shadow: 0 4px 0 #5C3E2B, inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  color: #FAF6EE;
+  background: linear-gradient(180deg, #976B45 0%, #7C5841 100%);
+  border: 2.5px solid #5C3E2B;
+  box-shadow: 0 4px 0 #5C3E2B, inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  color: #FFF9EE;
 }
 
 /* Tarjeta de pergamino suave */
 .cozy-card {
-  background: rgba(250, 246, 238, 0.96);
+  background: rgba(255, 249, 238, 0.96);
   border: 2px solid #E2D5BE;
   box-shadow: 0 8px 22px -6px rgba(92, 62, 43, 0.12);
-  border-radius: 1.25rem;
+  border-radius: 1.35rem;
 }
 
-/* Contenedor del lienzo 3D de juego */
+/* Contenedor del lienzo 3D */
 #villageCanvasWrapper {
   position: relative;
   width: 100%;
-  height: 100%;
   min-height: 440px;
-  border-radius: 1.35rem;
+  border-radius: 1.5rem;
   overflow: hidden;
-  border: 3px solid #7C5841;
-  box-shadow: 0 12px 32px rgba(92, 62, 43, 0.2), inset 0 0 0 2px rgba(232, 192, 125, 0.35);
-  background: linear-gradient(180deg, #BFE3F2 0%, #FFF2DE 100%);
+  border: 3px solid var(--hud-wood);
+  box-shadow: 0 6px 0 var(--hud-wood), 0 16px 32px rgba(74, 48, 28, 0.22);
+  background: linear-gradient(180deg, #6FBBE0 0%, #BEE6F7 55%, #FFF4DE 100%);
   touch-action: none;
   user-select: none;
 }
@@ -102,6 +104,7 @@ h1, h2, h3, .font-serif-cozy {
   z-index: 60 !important;
   border-radius: 0 !important;
   border: none !important;
+  box-shadow: none !important;
 }
 
 canvas#villageCanvas {
@@ -115,17 +118,200 @@ canvas#villageCanvas:active {
   cursor: grabbing;
 }
 
-/* Tooltip flotante 3D al hacer hover con Raycaster */
-#hoverTooltip3D {
+/* ==================== HUD VIDEOJUEGO COZY (Animal Crossing / Townscaper) ==================== */
+.hud-dock {
+  background: rgba(255, 249, 238, 0.95);
+  border: 2.5px solid var(--hud-wood);
+  box-shadow: 0 4px 0 var(--hud-wood), 0 8px 18px rgba(74, 48, 28, 0.18);
   backdrop-filter: blur(8px);
-  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.hud-dock .season-pill {
+  border-radius: 9999px !important;
+  padding: 0.25rem 0.7rem !important;
+  font-family: 'Nunito', sans-serif !important;
+  font-weight: 800 !important;
+  color: var(--wood-dark);
+  transition: transform 0.12s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.hud-dock .season-pill:hover {
+  background: #F4E6CE;
+}
+
+.hud-dock .season-pill.bg-sage-dark {
+  background: linear-gradient(180deg, #79A66E 0%, #5F8A56 100%) !important;
+  color: #FFF9EE !important;
+  box-shadow: 0 2px 0 #45683E !important;
+}
+
+.hud-dock .season-pill:active {
+  transform: translateY(1px);
+}
+
+/* Botones píldora 3D táctiles */
+.hud-pill-btn,
+#timeOfDayBtn,
+#btnTogglePreview {
+  background: var(--hud-parchment) !important;
+  color: var(--wood-dark) !important;
+  border: 2.5px solid var(--hud-wood) !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 4px 0 var(--hud-wood), 0 8px 16px rgba(74, 48, 28, 0.16) !important;
+  font-family: 'Nunito', sans-serif !important;
+  font-weight: 800 !important;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.15s ease !important;
+}
+
+.hud-pill-btn:hover,
+#timeOfDayBtn:hover,
+#btnTogglePreview:hover {
+  filter: brightness(1.02);
+  background: #FFFDF8 !important;
+}
+
+.hud-pill-btn:active,
+#timeOfDayBtn:active,
+#btnTogglePreview:active {
+  transform: translateY(2px) !important;
+  box-shadow: 0 2px 0 var(--hud-wood), 0 4px 10px rgba(74, 48, 28, 0.14) !important;
+}
+
+#fullscreenBtn,
+.hud-pill-wood {
+  background: linear-gradient(180deg, #9A6D44 0%, #7C5841 100%) !important;
+  color: #FFF9EE !important;
+  border-color: #5C3E2B !important;
+  box-shadow: 0 4px 0 #5C3E2B, 0 8px 16px rgba(74, 48, 28, 0.2) !important;
+}
+
+#fullscreenBtn:active,
+.hud-pill-wood:active {
+  box-shadow: 0 2px 0 #5C3E2B !important;
+}
+
+/* Estado activo de "Salir de Vista Previa" sobrescribiendo clases de modals.js */
+#btnTogglePreview.bg-gold {
+  background: linear-gradient(180deg, #F4C86A 0%, #DDA33B 100%) !important;
+  color: #4A321F !important;
+  border-color: var(--hud-wood) !important;
+  box-shadow: 0 4px 0 var(--hud-wood), 0 8px 16px rgba(74, 48, 28, 0.2) !important;
+}
+
+/* Banner Modo Paseo por el Futuro */
+.hud-preview-banner {
+  background: linear-gradient(180deg, #FFF5DB 0%, #FFE4A8 100%);
+  border: 2.5px solid var(--hud-wood);
+  color: var(--wood-dark);
+  box-shadow: 0 4px 0 var(--hud-wood), 0 10px 20px rgba(74, 48, 28, 0.2);
+}
+
+.hud-preview-exit {
+  background: var(--hud-wood);
+  color: #FFF9EE;
+  border: 2px solid #5C3E2B;
+  box-shadow: 0 2px 0 #5C3E2B;
+  font-weight: 800;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.hud-preview-exit:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #5C3E2B;
+}
+
+/* Tarjeta inferior de misión cozy */
+.hud-mission-card {
+  background: rgba(255, 249, 238, 0.96);
+  border: 2.5px solid var(--hud-wood);
+  box-shadow: 0 4px 0 var(--hud-wood), 0 10px 22px rgba(74, 48, 28, 0.18);
+  backdrop-filter: blur(8px);
+}
+
+.hud-mission-pct {
+  background: #E9F2DF;
+  color: #466B3F;
+  border: 1.5px solid #B7D1A4;
+}
+
+.hud-progress-track {
+  background: #EFE3CC;
+  border: 2px solid #C8B08E;
+  box-shadow: inset 0 2px 4px rgba(92, 62, 43, 0.14);
+}
+
+.hud-progress-fill {
+  background: linear-gradient(90deg, #6EA868 0%, #92C46C 55%, #EAB94C 100%);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* Bocadillos estilo Animal Crossing (Tooltip hover & Popover clic) */
+.cozy-speech-tooltip {
+  background: var(--hud-parchment);
+  color: var(--wood-dark);
+  border: 2.5px solid var(--hud-wood);
+  box-shadow: 0 4px 0 var(--hud-wood), 0 8px 18px rgba(74, 48, 28, 0.2);
+  transform: translate(-50%, -100%);
+  transition: opacity 0.12s ease;
   z-index: 25;
 }
 
-/* Contraste legible del HUD sobre cielo día, atardecer y noche */
-#villageCanvasWrapper .backdrop-blur-md,
-#villageCanvasWrapper .backdrop-blur {
-  box-shadow: 0 6px 18px rgba(45, 30, 20, 0.18);
+.cozy-speech-tooltip::before,
+.cozy-speech-tooltip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+.cozy-speech-tooltip::before {
+  bottom: -10px;
+  border-width: 10px 8px 0 8px;
+  border-color: var(--hud-wood) transparent transparent transparent;
+}
+
+.cozy-speech-tooltip::after {
+  bottom: -6px;
+  border-width: 7px 6px 0 6px;
+  border-color: var(--hud-parchment) transparent transparent transparent;
+}
+
+.cozy-speech-popover {
+  position: absolute;
+  z-index: 30;
+  width: 18rem;
+  max-width: calc(100% - 24px);
+  background: var(--hud-parchment);
+  border: 3px solid var(--hud-wood);
+  border-radius: 1.35rem;
+  padding: 0.9rem 1rem;
+  box-shadow: 0 5px 0 var(--hud-wood), 0 14px 28px rgba(74, 48, 28, 0.24);
+}
+
+.cozy-speech-popover::before,
+.cozy-speech-popover::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+.cozy-speech-popover::before {
+  bottom: -13px;
+  border-width: 13px 11px 0 11px;
+  border-color: var(--hud-wood) transparent transparent transparent;
+}
+
+.cozy-speech-popover::after {
+  bottom: -8px;
+  border-width: 9px 8px 0 8px;
+  border-color: var(--hud-parchment) transparent transparent transparent;
 }
 
 @keyframes floatSlow {
@@ -137,10 +323,9 @@ canvas#villageCanvas:active {
 }
 
 @keyframes popIn {
-  0% { opacity: 0; transform: scale(0.9) translateY(10px); }
+  0% { opacity: 0; transform: scale(0.92) translateY(8px); }
   100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 .animate-pop {
-  animation: popIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: popIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
-

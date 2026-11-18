@@ -47,11 +47,11 @@ window.VillageBuilders = (function () {
 
   function createWindowMaterial() {
     return new THREE.MeshStandardMaterial({
-      color: 0x93C0D1,
-      roughness: 0.35,
-      metalness: 0.12,
-      emissive: 0xFFCE70,
-      emissiveIntensity: 0.08
+      color: 0x8BC1D6,
+      roughness: 0.25,
+      metalness: 0.1,
+      emissive: 0xFFB84D,
+      emissiveIntensity: 0.04
     });
   }
 
@@ -145,16 +145,16 @@ window.VillageBuilders = (function () {
     const winMat = createWindowMaterial();
 
     const stoneTex = window.VillageTextures.getMossyStoneTexture(stoneHex, stoneShade, mossStrength);
-    const stoneMat = stdMat('#FFFFFF', { map: stoneTex, roughness: 0.92 });
+    const stoneMat = stdMat('#FFFFFF', { map: stoneTex, roughness: 0.88 });
 
     const wallTex = useStoneWalls
       ? stoneTex
       : window.VillageTextures.getPlasterTimberTexture(wallHex, trimHex);
-    const wallMat = stdMat('#FFFFFF', { map: wallTex, roughness: 0.88 });
+    const wallMat = stdMat('#FFFFFF', { map: wallTex, roughness: 0.84 });
 
     const roofTex = window.VillageTextures.getRoofShinglesTexture(roofHex, roofDark);
-    const roofMat = stdMat('#FFFFFF', { map: roofTex, roughness: 0.85 });
-    const trimMat = stdMat(trimHex, { roughness: 0.85 });
+    const roofMat = stdMat('#FFFFFF', { map: roofTex, roughness: 0.78 });
+    const trimMat = stdMat(trimHex, { roughness: 0.82 });
 
     // Stone foundation plinth with moss
     const plinthH = 0.16;

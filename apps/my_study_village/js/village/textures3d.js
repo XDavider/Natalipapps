@@ -1,8 +1,8 @@
 /* ==========================================================================
    My Study Village · Procedural 3D Textures (CanvasTexture Cache)
-   Zero external assets. Generates hand-painted Stardew / Animal Crossing
-   textures in memory for grass, mossy stone, timber plaster, roofs, water & roads.
-   Compatible with Three.js r147 (THREE.sRGBEncoding).
+   Zero external assets. Stylized Townscaper / Animal Crossing textures in
+   memory: soft meadow grass, mossy stone, warm honey-timber plaster, clean
+   pastel roof tiles, wood planks, crystal turquoise water & cobblestones.
    ========================================================================== */
 'use strict';
 
@@ -25,9 +25,19 @@ window.VillageTextures = (function () {
     return c;
   }
 
+  function applySRGB(tex) {
+    if (!tex || typeof THREE === 'undefined') return tex;
+    if ('colorSpace' in tex && THREE.SRGBColorSpace) {
+      tex.colorSpace = THREE.SRGBColorSpace;
+    } else {
+      tex.encoding = THREE.sRGBEncoding;
+    }
+    return tex;
+  }
+
   function toTexture(canvas, repeatX = 1, repeatY = 1) {
     const tex = new THREE.CanvasTexture(canvas);
-    tex.encoding = THREE.sRGBEncoding;
+    applySRGB(tex);
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(repeatX, repeatY);
@@ -63,13 +73,13 @@ window.VillageTextures = (function () {
     ctx.fillStyle = sPal.grass;
     ctx.fillRect(0, 0, size, size);
 
-    // Soft organic meadow patches (seamless wrapping via 3x3 offsets near edges)
-    for (let i = 0; i < 42; i++) {
+    // Smooth organic meadow patches (seamless wrapping)
+    for (let i = 0; i < 30; i++) {
       const x = rand() * size;
       const y = rand() * size;
-      const r = 14 + rand() * 24;
+      const r = 18 + rand() * 26;
       const col = i % 2 === 0 ? sPal.grassLight : sPal.grassDark;
-      ctx.fillStyle = hexToRgba(col, 0.35);
+      ctx.fillStyle = hexToRgba(col, 0.28);
       for (let ox = -1; ox <= 1; ox++) {
         for (let oy = -1; oy <= 1; oy++) {
           ctx.beginPath();
@@ -79,27 +89,23 @@ window.VillageTextures = (function () {
       }
     }
 
-    // Little Stardew-style grass blades and clover dots
-    for (let i = 0; i < 95; i++) {
+    // Delicate grass blades and tiny clover flecks
+    for (let i = 0; i < 58; i++) {
       const x = rand() * size;
       const y = rand() * size;
       const col = i % 3 === 0 ? sPal.tuft : sPal.grassDark;
-      ctx.strokeStyle = hexToRgba(col, 0.55);
-      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = hexToRgba(col, 0.42);
+      ctx.lineWidth = 1.4;
       ctx.lineCap = 'round';
-      for (let ox = -1; ox <= 1; ox += 2) {
-        // draw blade wrapped only if near border
-        const bx = x;
-        const by = y;
-        ctx.beginPath();
-        ctx.moveTo(bx, by);
-        ctx.lineTo(bx - 2, by - 5);
-        ctx.moveTo(bx + 2, by);
-        ctx.lineTo(bx + 3, by - 6);
-        ctx.stroke();
-      }
-      if (i % 7 === 0) {
-        ctx.fillStyle = hexToRgba(sPal.grassLight, 0.65);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - 1.5, y - 4.5);
+      ctx.moveTo(x + 2.5, y);
+      ctx.lineTo(x + 3.5, y - 5);
+      ctx.stroke();
+
+      if (i % 6 === 0) {
+        ctx.fillStyle = hexToRgba(sPal.grassLight, 0.55);
         ctx.beginPath();
         ctx.arc(x + 4, y + 3, 1.8, 0, Math.PI * 2);
         ctx.fill();
@@ -111,7 +117,7 @@ window.VillageTextures = (function () {
     return tex;
   }
 
-  function getMossyStoneTexture(baseHex = '#BDB4A6', shadeHex = '#9E9487', mossStrength = 0.75) {
+  function getMossyStoneTexture(baseHex = '#C6BCAE', shadeHex = '#ADA294', mossStrength = 0.75) {
     const key = `stone_${baseHex}_${shadeHex}_${mossStrength}`;
     if (cache.has(key)) return cache.get(key);
 
@@ -120,46 +126,46 @@ window.VillageTextures = (function () {
     const ctx = canvas.getContext('2d');
     const rand = seededRandom(307);
 
-    // Mortar base
+    // Soft warm mortar base
     ctx.fillStyle = shadeHex;
     ctx.fillRect(0, 0, size, size);
 
-    // Rounded masonry stones in staggered rows
-    const rows = 8;
+    // 6 clean rows of rounded masonry blocks
+    const rows = 6;
     const rowH = size / rows;
     for (let r = 0; r < rows; r++) {
-      let x = (r % 2) * -18;
+      let x = (r % 2) * -22;
       while (x < size) {
-        const w = 30 + rand() * 24;
+        const w = 40 + rand() * 24;
         const h = rowH - 5;
         const y = r * rowH + 2.5;
         const tint = rand();
-        ctx.fillStyle = tint > 0.65 ? hexToRgba('#FAF4E8', 0.25) : (tint < 0.25 ? hexToRgba(shadeHex, 0.7) : baseHex);
+        ctx.fillStyle = tint > 0.7 ? hexToRgba('#FFF8EB', 0.24) : (tint < 0.22 ? hexToRgba(shadeHex, 0.85) : baseHex);
         ctx.beginPath();
-        ctx.roundRect(x + 2, y, w - 4, h, 6);
+        ctx.roundRect(x + 2, y, w - 4, h, 8);
         ctx.fill();
 
-        // Warm top highlight on stone
-        ctx.fillStyle = 'rgba(255, 250, 240, 0.18)';
+        // Gentle sunlit top rim
+        ctx.fillStyle = 'rgba(255, 250, 240, 0.22)';
         ctx.beginPath();
-        ctx.roundRect(x + 4, y + 2, w - 8, h * 0.35, 3);
+        ctx.roundRect(x + 5, y + 2.5, w - 10, h * 0.28, 4);
         ctx.fill();
 
         x += w;
       }
     }
 
-    // Organic green moss climbing up from bottom and tucked in crevices
+    // Velvety organic green moss concentrated around base and corners
     if (mossStrength > 0) {
-      const mossColors = ['#6E9664', '#82AA74', '#5A7F54'];
-      const count = Math.round(45 * mossStrength);
+      const mossColors = ['#76A36B', '#88B47A', '#648E5B'];
+      const count = Math.round(28 * mossStrength);
       for (let i = 0; i < count; i++) {
-        const mx = rand() * size;
-        // Concentrate heavier toward bottom of wall (high y)
-        const bias = Math.pow(rand(), 0.55);
-        const my = size * (0.28 + 0.72 * bias);
-        const mr = 5 + rand() * 14 * (my / size);
-        ctx.fillStyle = hexToRgba(mossColors[i % mossColors.length], 0.45 + rand() * 0.35);
+        const cornerBias = rand() < 0.5 ? rand() * 0.25 : 0.75 + rand() * 0.25;
+        const mx = rand() < 0.65 ? cornerBias * size : rand() * size;
+        const bias = Math.pow(rand(), 0.45);
+        const my = size * (0.42 + 0.58 * bias);
+        const mr = 7 + rand() * 14 * (my / size);
+        ctx.fillStyle = hexToRgba(mossColors[i % mossColors.length], 0.48 + rand() * 0.26);
         ctx.beginPath();
         ctx.arc(mx, my, mr, 0, Math.PI * 2);
         ctx.fill();
@@ -171,7 +177,7 @@ window.VillageTextures = (function () {
     return tex;
   }
 
-  function getPlasterTimberTexture(plasterHex = '#FBF3E2', trimHex = '#7A5134') {
+  function getPlasterTimberTexture(plasterHex = '#FFF8EB', trimHex = '#A67C52') {
     const key = `plaster_${plasterHex}_${trimHex}`;
     if (cache.has(key)) return cache.get(key);
 
@@ -180,27 +186,27 @@ window.VillageTextures = (function () {
     const ctx = canvas.getContext('2d');
     const rand = seededRandom(509);
 
-    ctx.fillStyle = plasterHex;
+    ctx.fillStyle = plasterHex === '#FBF3E2' ? '#FFF8EB' : plasterHex;
     ctx.fillRect(0, 0, size, size);
 
-    // Subtle handcrafted brush texture
-    for (let i = 0; i < 80; i++) {
-      ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.22)' : 'rgba(130, 95, 65, 0.06)';
+    // Very soft painterly warmth
+    for (let i = 0; i < 40; i++) {
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 255, 255, 0.26)' : 'rgba(166, 124, 82, 0.04)';
       ctx.beginPath();
-      ctx.arc(rand() * size, rand() * size, 8 + rand() * 18, 0, Math.PI * 2);
+      ctx.arc(rand() * size, rand() * size, 12 + rand() * 20, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Timber cross-beams border
+    // Honey-wood perimeter framing
     ctx.strokeStyle = trimHex;
-    ctx.lineWidth = 14;
-    ctx.strokeRect(7, 7, size - 14, size - 14);
+    ctx.lineWidth = 12;
+    ctx.strokeRect(6, 6, size - 12, size - 12);
 
-    // Subtle moss dots at bottom beam
-    ctx.fillStyle = 'rgba(104, 146, 94, 0.55)';
-    for (let i = 0; i < 12; i++) {
+    // Subtle moss kiss along lower beam
+    ctx.fillStyle = 'rgba(116, 162, 106, 0.48)';
+    for (let i = 0; i < 8; i++) {
       ctx.beginPath();
-      ctx.arc(rand() * size, size - 4 - rand() * 10, 4 + rand() * 6, 0, Math.PI * 2);
+      ctx.arc(rand() * size, size - 4 - rand() * 7, 5 + rand() * 6, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -209,7 +215,7 @@ window.VillageTextures = (function () {
     return tex;
   }
 
-  function getRoofShinglesTexture(roofHex = '#CB7A5C', darkHex = '#A85C43') {
+  function getRoofShinglesTexture(roofHex = '#D48367', darkHex = '#B86A50') {
     const key = `roof_${roofHex}_${darkHex}`;
     if (cache.has(key)) return cache.get(key);
 
@@ -218,38 +224,40 @@ window.VillageTextures = (function () {
     const ctx = canvas.getContext('2d');
     const rand = seededRandom(719);
 
-    ctx.fillStyle = darkHex;
+    // Clean warm base
+    ctx.fillStyle = roofHex;
     ctx.fillRect(0, 0, size, size);
 
-    const rows = 10;
+    // 6 wide, rounded Townscaper-style shingle rows with gentle contrast
+    const rows = 6;
     const rowH = size / rows;
     for (let r = 0; r < rows; r++) {
-      const offset = (r % 2) * 14;
-      for (let x = -20 + offset; x < size + 20; x += 28) {
-        ctx.fillStyle = rand() > 0.25 ? roofHex : darkHex;
+      const offset = (r % 2) * 22;
+      // Soft row drop shadow
+      ctx.fillStyle = hexToRgba(darkHex, 0.28);
+      ctx.fillRect(0, (r + 1) * rowH - 3, size, 3.5);
+
+      for (let x = -28 + offset; x < size + 28; x += 44) {
+        const tonePick = rand();
+        ctx.fillStyle = tonePick > 0.72
+          ? 'rgba(255, 246, 232, 0.13)'
+          : (tonePick < 0.22 ? hexToRgba(darkHex, 0.24) : roofHex);
         ctx.beginPath();
-        ctx.roundRect(x + 1, r * rowH + 1, 25, rowH + 3, [2, 2, 9, 9]);
+        ctx.roundRect(x + 2, r * rowH + 2, 40, rowH - 3, [4, 4, 14, 14]);
         ctx.fill();
 
-        ctx.fillStyle = 'rgba(255, 248, 235, 0.14)';
-        ctx.fillRect(x + 4, r * rowH + 2, 19, 3);
+        // Warm top sheen
+        ctx.fillStyle = 'rgba(255, 250, 240, 0.16)';
+        ctx.fillRect(x + 7, r * rowH + 3.5, 30, 3);
       }
     }
 
-    // Light cozy moss specks on shingles
-    for (let i = 0; i < 16; i++) {
-      ctx.fillStyle = 'rgba(116, 156, 102, 0.42)';
-      ctx.beginPath();
-      ctx.arc(rand() * size, rand() * size, 3 + rand() * 5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    const tex = toTexture(canvas, 2, 2);
+    const tex = toTexture(canvas, 1.4, 1.4);
     cache.set(key, tex);
     return tex;
   }
 
-  function getWoodPlanksTexture(woodHex = '#A67046') {
+  function getWoodPlanksTexture(woodHex = '#B58354') {
     const key = `wood_${woodHex}`;
     if (cache.has(key)) return cache.get(key);
 
@@ -261,23 +269,22 @@ window.VillageTextures = (function () {
     ctx.fillStyle = woodHex;
     ctx.fillRect(0, 0, size, size);
 
-    const planks = 8;
+    const planks = 7;
     const ph = size / planks;
     for (let p = 0; p < planks; p++) {
-      ctx.fillStyle = p % 2 === 0 ? 'rgba(255, 240, 215, 0.08)' : 'rgba(55, 30, 15, 0.09)';
+      ctx.fillStyle = p % 2 === 0 ? 'rgba(255, 245, 225, 0.08)' : 'rgba(70, 42, 20, 0.06)';
       ctx.fillRect(0, p * ph, size, ph);
 
-      ctx.fillStyle = 'rgba(55, 30, 15, 0.28)';
-      ctx.fillRect(0, p * ph, size, 2);
+      ctx.fillStyle = 'rgba(70, 42, 20, 0.22)';
+      ctx.fillRect(0, p * ph, size, 1.8);
 
-      // Soft wood grain lines
-      ctx.strokeStyle = 'rgba(70, 38, 18, 0.16)';
+      ctx.strokeStyle = 'rgba(85, 48, 24, 0.13)';
       ctx.lineWidth = 1.2;
-      for (let g = 0; g < 3; g++) {
-        const gy = p * ph + 6 + rand() * (ph - 12);
+      for (let g = 0; g < 2; g++) {
+        const gy = p * ph + 8 + rand() * (ph - 16);
         ctx.beginPath();
         ctx.moveTo(0, gy);
-        ctx.bezierCurveTo(size * 0.3, gy + (rand() - 0.5) * 6, size * 0.7, gy + (rand() - 0.5) * 6, size, gy);
+        ctx.bezierCurveTo(size * 0.3, gy + (rand() - 0.5) * 5, size * 0.7, gy + (rand() - 0.5) * 5, size, gy);
         ctx.stroke();
       }
     }
@@ -287,7 +294,7 @@ window.VillageTextures = (function () {
     return tex;
   }
 
-  function getWaterTexture(waterHex = '#7EC8DE', lightHex = '#C4EAF3') {
+  function getWaterTexture(waterHex = '#4CC6D4', lightHex = '#E0FBFF') {
     const key = `water_${waterHex}_${lightHex}`;
     if (cache.has(key)) return cache.get(key);
 
@@ -296,30 +303,35 @@ window.VillageTextures = (function () {
     const ctx = canvas.getContext('2d');
     const rand = seededRandom(1103);
 
-    ctx.fillStyle = waterHex;
+    // Crystal turquoise base gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, size);
+    grad.addColorStop(0, '#55CED8');
+    grad.addColorStop(0.5, waterHex === '#7EC8DE' ? '#4CC6D4' : waterHex);
+    grad.addColorStop(1, '#55CED8');
+    ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
 
-    // Gentle lofi caustic ribbons & ripples
-    ctx.strokeStyle = hexToRgba(lightHex, 0.55);
+    // Gentle crystal caustic ribbons
+    ctx.strokeStyle = hexToRgba(lightHex || '#E0FBFF', 0.62);
     ctx.lineCap = 'round';
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 24; i++) {
       const x = rand() * size;
       const y = rand() * size;
-      const len = 24 + rand() * 36;
-      ctx.lineWidth = 2 + rand() * 2;
+      const len = 26 + rand() * 34;
+      ctx.lineWidth = 1.8 + rand() * 1.8;
       for (let ox = -1; ox <= 1; ox++) {
         ctx.beginPath();
         ctx.moveTo(x + ox * size, y);
-        ctx.quadraticCurveTo(x + ox * size + len * 0.5, y - 6, x + ox * size + len, y);
+        ctx.quadraticCurveTo(x + ox * size + len * 0.5, y - 5, x + ox * size + len, y);
         ctx.stroke();
       }
     }
 
-    // Soft foam sparkles
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-    for (let i = 0; i < 18; i++) {
+    // Soft sun-kissed sparkles
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    for (let i = 0; i < 16; i++) {
       ctx.beginPath();
-      ctx.arc(rand() * size, rand() * size, 1.5 + rand() * 2, 0, Math.PI * 2);
+      ctx.arc(rand() * size, rand() * size, 1.4 + rand() * 1.8, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -337,28 +349,28 @@ window.VillageTextures = (function () {
     const ctx = canvas.getContext('2d');
     const rand = seededRandom(1301);
 
-    ctx.fillStyle = '#DFD1B8';
+    ctx.fillStyle = '#E6D9C2';
     ctx.fillRect(0, 0, size, size);
 
-    const palette = ['#C7B79F', '#BCAE97', '#D3C5AF', '#B5A58C'];
-    for (let i = 0; i < 64; i++) {
+    const palette = ['#CFC0A8', '#C4B49C', '#D8CBB6', '#BBA990'];
+    for (let i = 0; i < 54; i++) {
       const x = rand() * size;
       const y = rand() * size;
-      const rx = 10 + rand() * 11;
-      const ry = 7 + rand() * 9;
+      const rx = 11 + rand() * 11;
+      const ry = 8 + rand() * 9;
       const rot = rand() * Math.PI;
       ctx.fillStyle = palette[i % palette.length];
       ctx.beginPath();
       ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(92, 62, 43, 0.22)';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(120, 86, 56, 0.2)';
+      ctx.lineWidth = 1.4;
       ctx.stroke();
     }
 
-    // Tiny moss tufts between cobblestones
-    ctx.fillStyle = 'rgba(110, 152, 98, 0.65)';
-    for (let i = 0; i < 24; i++) {
+    // Subtle moss flecks between stones
+    ctx.fillStyle = 'rgba(118, 162, 106, 0.58)';
+    for (let i = 0; i < 18; i++) {
       ctx.beginPath();
       ctx.arc(rand() * size, rand() * size, 2.5 + rand() * 3.5, 0, Math.PI * 2);
       ctx.fill();
@@ -370,6 +382,7 @@ window.VillageTextures = (function () {
   }
 
   return {
+    applySRGB,
     getGrassTexture,
     getMossyStoneTexture,
     getPlasterTimberTexture,
@@ -379,4 +392,3 @@ window.VillageTextures = (function () {
     getCobbleRoadTexture
   };
 })();
-

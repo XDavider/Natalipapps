@@ -49,8 +49,12 @@ const constructionAnimations = {};
   let hemiLight = null;
   let sunLight = null;
   let fillLight = null;
+  let villagePointLight = null;
   let starField = null;
   let skyCanvasMesh = null;
+  let skyUniforms = null;
+  let celestialDisc = null;
+  let celestialGlow = null;
 
   // Scene groups
   let worldGroup = null;
@@ -87,6 +91,8 @@ const constructionAnimations = {};
   let fireflyPoints = null;
   let snowPoints = null;
   let petalPoints = null;
+  let pollenPoints = null;
+  let autumnPoints = null;
 
   // Signature caches for reactive updates
   let lastSeason = null;
@@ -103,8 +109,8 @@ const constructionAnimations = {};
   let lastFrameNow = performance.now();
 
   // Camera animation target
-  const DEFAULT_CAM_POS = new THREE.Vector3(17.5, 16.0, 17.5);
-  const DEFAULT_TARGET = new THREE.Vector3(0, 0.35, 0.55);
+  const DEFAULT_CAM_POS = new THREE.Vector3(19.2, 16.8, 19.2);
+  const DEFAULT_TARGET = new THREE.Vector3(0, -0.1, 0.4);
   let camAnimActive = false;
   const camGoalPos = new THREE.Vector3();
   const camGoalTarget = new THREE.Vector3();
@@ -171,8 +177,13 @@ const constructionAnimations = {};
     const wrap = document.getElementById('villageCanvasWrapper');
     if (!canvas || !wrap || typeof THREE === 'undefined') return false;
 
+    if (THREE.ColorManagement) {
+      if ('enabled' in THREE.ColorManagement) THREE.ColorManagement.enabled = true;
+      if ('legacyMode' in THREE.ColorManagement) THREE.ColorManagement.legacyMode = false;
+    }
+
     scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0xDDEEF5, 0.011);
+    scene.fog = new THREE.FogExp2(0xF3E9D8, 0.0055);
 
     const w = Math.max(1, wrap.clientWidth);
     const h = Math.max(1, wrap.clientHeight);
@@ -189,9 +200,13 @@ const constructionAnimations = {};
     renderer.setSize(w, h, false);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.outputEncoding = THREE.sRGBEncoding;
+    if ('outputColorSpace' in renderer && THREE.SRGBColorSpace) {
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+    } else {
+      renderer.outputEncoding = THREE.sRGBEncoding;
+    }
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.06;
+    renderer.toneMappingExposure = 1.1;
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.target.copy(DEFAULT_TARGET);
@@ -211,28 +226,32 @@ const constructionAnimations = {};
 
     raycaster = new THREE.Raycaster();
 
-    // Warm cozy lighting
-    hemiLight = new THREE.HemisphereLight(0xFFF6E8, 0x8BA88E, 0.75);
+    // Warm cozy lighting (Sky/Grass hemisphere + Golden directional sun + Warm village core)
+    hemiLight = new THREE.HemisphereLight(0xFFF6E6, 0x6D9458, 0.62);
     scene.add(hemiLight);
 
-    sunLight = new THREE.DirectionalLight(0xFFF1D6, 1.05);
-    sunLight.position.set(14, 22, 12);
+    sunLight = new THREE.DirectionalLight(0xFFE2B0, 1.35);
+    sunLight.position.set(15, 21, 12);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.camera.near = 2;
-    sunLight.shadow.camera.far = 60;
-    sunLight.shadow.camera.left = -15;
-    sunLight.shadow.camera.right = 15;
-    sunLight.shadow.camera.top = 15;
-    sunLight.shadow.camera.bottom = -15;
+    sunLight.shadow.camera.far = 62;
+    sunLight.shadow.camera.left = -15.5;
+    sunLight.shadow.camera.right = 15.5;
+    sunLight.shadow.camera.top = 15.5;
+    sunLight.shadow.camera.bottom = -15.5;
     sunLight.shadow.bias = -0.0005;
     sunLight.shadow.normalBias = 0.03;
     scene.add(sunLight);
 
-    fillLight = new THREE.DirectionalLight(0xB8D8F0, 0.32);
+    fillLight = new THREE.DirectionalLight(0xB8DCF7, 0.25);
     fillLight.position.set(-14, 10, -12);
     scene.add(fillLight);
+
+    villagePointLight = new THREE.PointLight(0xFFB85C, 0, 18, 2);
+    villagePointLight.position.set(0, 2.2, 0);
+    scene.add(villagePointLight);
 
     // Groups hierarchy
     worldGroup = new THREE.Group();
@@ -269,20 +288,59 @@ const constructionAnimations = {};
   }
 
   /* ------------------------------------------------------------------------
-     Sky Backdrop & Night Stars
+     Sky Gradient Shader Backdrop, Sun/Moon Disc & Night Stars
      ------------------------------------------------------------------------ */
   function buildSkyDomeAndStars() {
-    const geo = new THREE.SphereGeometry(90, 20, 14);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xCFE8F3,
+    const geo = new THREE.SphereGeometry(92, 24, 16);
+    skyUniforms = {
+      uTopColor: { value: new THREE.Color('#6FBBE0') },
+      uMidColor: { value: new THREE.Color('#BEE6F7') },
+      uBottomColor: { value: new THREE.Color('#FFF4DE') }
+    };
+    const mat = new THREE.ShaderMaterial({
+      uniforms: skyUniforms,
       side: THREE.BackSide,
-      fog: false
+      fog: false,
+      depthWrite: false,
+      vertexShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorldPos = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uTopColor;
+        uniform vec3 uMidColor;
+        uniform vec3 uBottomColor;
+        varying vec3 vWorldPos;
+        void main() {
+          float h = normalize(vWorldPos).y;
+          vec3 col = mix(uBottomColor, uMidColor, smoothstep(-0.08, 0.28, h));
+          col = mix(col, uTopColor, smoothstep(0.22, 0.78, h));
+          gl_FragColor = vec4(col, 1.0);
+          #include <tonemapping_fragment>
+          #include <encodings_fragment>
+        }
+      `
     });
     skyCanvasMesh = new THREE.Mesh(geo, mat);
     scene.add(skyCanvasMesh);
 
+    // Soft glowing sun / moon disc in the sky
+    celestialGlow = new THREE.Mesh(
+      new THREE.CircleGeometry(6.8, 24),
+      new THREE.MeshBasicMaterial({ color: 0xFFF3C4, transparent: true, opacity: 0.22, fog: false, depthWrite: false })
+    );
+    celestialDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(3.2, 24),
+      new THREE.MeshBasicMaterial({ color: 0xFFF8DC, transparent: true, opacity: 0.92, fog: false, depthWrite: false })
+    );
+    scene.add(celestialGlow, celestialDisc);
+
     // Night stars
-    const count = 180;
+    const count = 190;
     const pos = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
       const theta = Math.random() * Math.PI * 2;
@@ -339,36 +397,53 @@ const constructionAnimations = {};
     const season = (typeof state !== 'undefined' && state.season) || 'spring';
     const sPal = SEASON_PALETTES[season] || SEASON_PALETTES.spring;
 
-    // 1. Solid Earth & Rock Cliff Core (underneath grass banks, forming carved riverbed)
+    // 1. Floating Diorama Base: Warm Dirt Stratum + Two-Tone Stepped Stone Plinth
     const baseShape = createRoundedSquareShape(ISLAND_HALF, ISLAND_CORNER);
     const coreGeo = new THREE.ExtrudeGeometry(baseShape, {
-      depth: 1.55,
+      depth: 0.65,
       bevelEnabled: true,
-      bevelThickness: 0.14,
+      bevelThickness: 0.12,
       bevelSize: 0.14,
       bevelSegments: 2
     });
     coreGeo.rotateX(Math.PI / 2);
-    const earthMat = new THREE.MeshStandardMaterial({ color: 0x7D5A3F, roughness: 0.95 });
+    const earthMat = new THREE.MeshStandardMaterial({ color: 0x8B5E3C, roughness: 0.94 });
     const coreMesh = new THREE.Mesh(coreGeo, earthMat);
-    coreMesh.position.y = -0.41;
+    coreMesh.position.y = -0.39;
     coreMesh.receiveShadow = true;
     terrainGroup.add(coreMesh);
 
-    // Lower rock stratum taper
-    const rockGeo = new THREE.ExtrudeGeometry(createRoundedSquareShape(ISLAND_HALF - 0.55, 1.2), {
-      depth: 0.95,
+    // Upper stone plinth band
+    const upperRockGeo = new THREE.ExtrudeGeometry(createRoundedSquareShape(ISLAND_HALF - 0.18, 1.32), {
+      depth: 0.72,
       bevelEnabled: true,
-      bevelThickness: 0.25,
-      bevelSize: 0.25,
+      bevelThickness: 0.12,
+      bevelSize: 0.14,
+      bevelSegments: 2
+    });
+    upperRockGeo.rotateX(Math.PI / 2);
+    const upperRockMesh = new THREE.Mesh(
+      upperRockGeo,
+      new THREE.MeshStandardMaterial({ color: 0x7E756B, roughness: 0.95 })
+    );
+    upperRockMesh.position.y = -0.96;
+    upperRockMesh.receiveShadow = true;
+    terrainGroup.add(upperRockMesh);
+
+    // Lower tapered rock plinth
+    const rockGeo = new THREE.ExtrudeGeometry(createRoundedSquareShape(ISLAND_HALF - 0.62, 1.18), {
+      depth: 0.85,
+      bevelEnabled: true,
+      bevelThickness: 0.22,
+      bevelSize: 0.22,
       bevelSegments: 2
     });
     rockGeo.rotateX(Math.PI / 2);
     const rockMesh = new THREE.Mesh(
       rockGeo,
-      new THREE.MeshStandardMaterial({ color: 0x624A3A, roughness: 0.96 })
+      new THREE.MeshStandardMaterial({ color: 0x5E564E, roughness: 0.96 })
     );
-    rockMesh.position.y = -1.65;
+    rockMesh.position.y = -1.68;
     terrainGroup.add(rockMesh);
 
     // 2. North & South Grass Banks separated by the curved riverbed
@@ -468,10 +543,20 @@ const constructionAnimations = {};
     bedGeo.computeVertexNormals();
     const bedMesh = new THREE.Mesh(
       bedGeo,
-      new THREE.MeshStandardMaterial({ color: 0x3D6E7E, roughness: 0.9 })
+      new THREE.MeshStandardMaterial({ color: 0x2F8796, roughness: 0.88 })
     );
     bedMesh.receiveShadow = true;
     terrainGroup.add(bedMesh);
+
+    // Submerged river pebbles visible under crystal water
+    const subPebbleMat = new THREE.MeshStandardMaterial({ color: 0x99B6B8, roughness: 0.85 });
+    for (let i = 0; i < 14; i++) {
+      const wx = -9 + i * 1.38;
+      const peb = new THREE.Mesh(new THREE.DodecahedronGeometry(0.11 + (i % 3) * 0.03, 0), subPebbleMat);
+      peb.scale.set(1.3, 0.45, 1.1);
+      peb.position.set(wx, -0.22, riverCenterZ(wx) + ((i % 3) - 1) * 0.22);
+      terrainGroup.add(peb);
+    }
 
     const waterGeo = new THREE.BufferGeometry();
     waterGeo.setAttribute('position', new THREE.Float32BufferAttribute(waterPositions, 3));
@@ -479,13 +564,13 @@ const constructionAnimations = {};
     waterGeo.setIndex(waterIndices);
     waterGeo.computeVertexNormals();
 
-    riverWaterTex = window.VillageTextures.getWaterTexture(sPal.water, sPal.waterLight);
+    riverWaterTex = window.VillageTextures.getWaterTexture('#4CC6D4', '#E0FBFF');
     riverWaterMat = new THREE.MeshStandardMaterial({
       map: riverWaterTex,
       transparent: true,
-      opacity: 0.78,
-      roughness: 0.18,
-      metalness: 0.08
+      opacity: 0.72,
+      roughness: 0.12,
+      metalness: 0.12
     });
     const waterMesh = new THREE.Mesh(waterGeo, riverWaterMat);
     waterMesh.receiveShadow = true;
@@ -542,16 +627,22 @@ const constructionAnimations = {};
     }
     terrainGroup.add(waterfallFoamGroup);
 
-    // 5. Mossy cliff boulders peeking out of the diorama sides
+    // 5. Mossy cliff boulders & rounded stone rim peeking out of all 4 diorama sides
     const cliffRockPositions = [
-      [-6.5, -0.8, ISLAND_HALF + 0.12],
-      [4.5, -0.7, ISLAND_HALF + 0.12],
-      [-ISLAND_HALF - 0.1, -0.85, 1.5],
-      [ISLAND_HALF + 0.1, -0.75, -4.2],
-      [-2.5, -0.9, -ISLAND_HALF - 0.1]
+      [-6.5, -0.78, ISLAND_HALF + 0.14],
+      [-1.8, -0.86, ISLAND_HALF + 0.15],
+      [4.5, -0.72, ISLAND_HALF + 0.14],
+      [-ISLAND_HALF - 0.14, -0.82, -3.6],
+      [-ISLAND_HALF - 0.12, -0.85, 1.5],
+      [-ISLAND_HALF - 0.13, -0.78, 7.0],
+      [ISLAND_HALF + 0.14, -0.75, -4.2],
+      [ISLAND_HALF + 0.13, -0.82, 0.8],
+      [-5.2, -0.84, -ISLAND_HALF - 0.14],
+      [-1.5, -0.88, -ISLAND_HALF - 0.12],
+      [4.8, -0.76, -ISLAND_HALF - 0.14]
     ];
     cliffRockPositions.forEach(([rx, ry, rz], idx) => {
-      const b = window.VillageBuilders.buildMossyBoulder3D(1.25 + (idx % 2) * 0.35);
+      const b = window.VillageBuilders.buildMossyBoulder3D(1.15 + (idx % 3) * 0.25);
       b.position.set(rx, ry, rz);
       terrainGroup.add(b);
     });
@@ -746,29 +837,42 @@ const constructionAnimations = {};
     fireflyPoints.visible = false;
     ambientGroup.add(fireflyPoints);
 
-    // 5. Winter Snow & Spring Sakura Petals
-    const wCount = 90;
+    // 5. Seasonal Ambient Particles: Spring Petals, Summer Pollen, Autumn Leaves & Winter Snow
+    const wCount = 80;
     const sPos = new Float32Array(wCount * 3);
     const pPos = new Float32Array(wCount * 3);
+    const gPos = new Float32Array(wCount * 3);
+    const aPos = new Float32Array(wCount * 3);
     for (let i = 0; i < wCount; i++) {
-      sPos[i * 3] = (Math.random() - 0.5) * 22;
-      sPos[i * 3 + 1] = Math.random() * 10;
-      sPos[i * 3 + 2] = (Math.random() - 0.5) * 22;
-      pPos[i * 3] = sPos[i * 3];
-      pPos[i * 3 + 1] = sPos[i * 3 + 1];
-      pPos[i * 3 + 2] = sPos[i * 3 + 2];
+      const rx = (Math.random() - 0.5) * 20;
+      const ry = Math.random() * 9.5;
+      const rz = (Math.random() - 0.5) * 20;
+      sPos[i * 3] = rx; sPos[i * 3 + 1] = ry; sPos[i * 3 + 2] = rz;
+      pPos[i * 3] = rx; pPos[i * 3 + 1] = ry; pPos[i * 3 + 2] = rz;
+      gPos[i * 3] = (Math.random() - 0.5) * 18; gPos[i * 3 + 1] = 0.5 + Math.random() * 5; gPos[i * 3 + 2] = (Math.random() - 0.5) * 18;
+      aPos[i * 3] = (Math.random() - 0.5) * 20; aPos[i * 3 + 1] = Math.random() * 9.5; aPos[i * 3 + 2] = (Math.random() - 0.5) * 20;
     }
     const snowGeo = new THREE.BufferGeometry();
     snowGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
-    snowPoints = new THREE.Points(snowGeo, new THREE.PointsMaterial({ color: 0xFFFFFF, size: 0.14, transparent: true, opacity: 0.88 }));
+    snowPoints = new THREE.Points(snowGeo, new THREE.PointsMaterial({ color: 0xFFFFFF, size: 0.14, transparent: true, opacity: 0.85 }));
     snowPoints.visible = false;
 
     const petalGeo = new THREE.BufferGeometry();
     petalGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-    petalPoints = new THREE.Points(petalGeo, new THREE.PointsMaterial({ color: 0xF7A8C0, size: 0.16, transparent: true, opacity: 0.85 }));
+    petalPoints = new THREE.Points(petalGeo, new THREE.PointsMaterial({ color: 0xF7A8C0, size: 0.16, transparent: true, opacity: 0.82 }));
     petalPoints.visible = false;
 
-    ambientGroup.add(snowPoints, petalPoints);
+    const pollenGeo = new THREE.BufferGeometry();
+    pollenGeo.setAttribute('position', new THREE.BufferAttribute(gPos, 3));
+    pollenPoints = new THREE.Points(pollenGeo, new THREE.PointsMaterial({ color: 0xFFF099, size: 0.12, transparent: true, opacity: 0.7 }));
+    pollenPoints.visible = false;
+
+    const autumnGeo = new THREE.BufferGeometry();
+    autumnGeo.setAttribute('position', new THREE.BufferAttribute(aPos, 3));
+    autumnPoints = new THREE.Points(autumnGeo, new THREE.PointsMaterial({ color: 0xE6864C, size: 0.16, transparent: true, opacity: 0.82 }));
+    autumnPoints.visible = false;
+
+    ambientGroup.add(snowPoints, petalPoints, pollenPoints, autumnPoints);
   }
 
   /* ------------------------------------------------------------------------
@@ -812,7 +916,9 @@ const constructionAnimations = {};
         meadowSouthMesh.material.needsUpdate = true;
       }
       if (riverWaterMat) {
-        riverWaterMat.map = window.VillageTextures.getWaterTexture(sPal.water, sPal.waterLight);
+        const wHex = season === 'winter' ? '#88D4E6' : '#4CC6D4';
+        riverWaterTex = window.VillageTextures.getWaterTexture(wHex, '#E0FBFF');
+        riverWaterMat.map = riverWaterTex;
         riverWaterMat.needsUpdate = true;
       }
       treeRecords.forEach(t => window.VillageBuilders.updateTreeSeason(t, season));
@@ -1008,51 +1114,100 @@ const constructionAnimations = {};
   }
 
   /* ------------------------------------------------------------------------
-     Day / Sunset / Night Atmosphere & Lighting
+     Day / Sunset / Night Atmosphere, Gradient Sky, Fog & Lighting
      ------------------------------------------------------------------------ */
+  const SKY_PRESETS = {
+    spring: { top: '#6FBBE0', mid: '#BEE6F7', bot: '#FFF4DE', fog: '#F3E9D8', density: 0.0055 },
+    summer: { top: '#57B0E2', mid: '#A4DBF5', bot: '#FFF5D6', fog: '#F2EAD8', density: 0.0052 },
+    autumn: { top: '#8CA4C8', mid: '#E6C4A4', bot: '#FDE2BF', fog: '#F0D5B8', density: 0.0062 },
+    winter: { top: '#87B0D4', mid: '#C8DDEB', bot: '#F2F7FC', fog: '#E4EEF6', density: 0.0064 },
+    sunset: { top: '#5E5482', mid: '#E88B6E', bot: '#FFD99E', fog: '#F2B990', density: 0.0068 },
+    night:  { top: '#121A2E', mid: '#223252', bot: '#3A4E70', fog: '#253654', density: 0.0072 }
+  };
+
   function updateAtmosphere(now) {
     const lighting = getEffectiveLighting();
     const season = state.season || 'spring';
-    const sPal = SEASON_PALETTES[season] || SEASON_PALETTES.spring;
     const isNight = lighting === 'night';
     const isSunset = lighting === 'sunset';
 
+    const preset = isNight
+      ? SKY_PRESETS.night
+      : (isSunset ? SKY_PRESETS.sunset : (SKY_PRESETS[season] || SKY_PRESETS.spring));
+
+    if (skyUniforms) {
+      skyUniforms.uTopColor.value.set(preset.top);
+      skyUniforms.uMidColor.value.set(preset.mid);
+      skyUniforms.uBottomColor.value.set(preset.bot);
+    }
+    scene.fog.color.set(preset.fog);
+    scene.fog.density = preset.density;
+
     if (isNight) {
-      skyCanvasMesh.material.color.setHex(0x1B263B);
-      scene.fog.color.setHex(0x1B263B);
-      hemiLight.color.setHex(0x6D88B0);
-      hemiLight.groundColor.setHex(0x28303E);
-      hemiLight.intensity = 0.55;
-      sunLight.color.setHex(0xA6C4EE);
-      sunLight.intensity = 0.45;
-      fillLight.intensity = 0.25;
+      hemiLight.color.setHex(0x5C78AD);
+      hemiLight.groundColor.setHex(0x252E3D);
+      hemiLight.intensity = 0.48;
+      sunLight.color.setHex(0xA2C2F0);
+      sunLight.intensity = 0.58;
+      sunLight.position.set(-12, 18, 10);
+      fillLight.color.setHex(0x485E8A);
+      fillLight.intensity = 0.20;
+      if (villagePointLight) villagePointLight.intensity = 1.15;
       starField.material.opacity = 0.78 + 0.18 * Math.sin(now * 0.002);
     } else if (isSunset) {
-      skyCanvasMesh.material.color.setHex(0xF3B796);
-      scene.fog.color.setHex(0xF3B796);
-      hemiLight.color.setHex(0xFFD6BA);
-      hemiLight.groundColor.setHex(0x8E7A6E);
-      hemiLight.intensity = 0.72;
-      sunLight.color.setHex(0xFFAE70);
-      sunLight.intensity = 1.05;
-      fillLight.intensity = 0.3;
+      hemiLight.color.setHex(0xFFD0A8);
+      hemiLight.groundColor.setHex(0x6E5547);
+      hemiLight.intensity = 0.58;
+      sunLight.color.setHex(0xFF9D5C);
+      sunLight.intensity = 1.45;
+      sunLight.position.set(18, 10, 14);
+      fillLight.color.setHex(0xD6A0BA);
+      fillLight.intensity = 0.28;
+      if (villagePointLight) villagePointLight.intensity = 0.65;
       starField.material.opacity = 0;
     } else {
-      skyCanvasMesh.material.color.set(sPal.skyTop);
-      scene.fog.color.set(sPal.skyBottom);
-      hemiLight.color.setHex(0xFFF8EC);
-      hemiLight.groundColor.setHex(0x8BA88E);
-      hemiLight.intensity = 0.8;
-      sunLight.color.setHex(0xFFF1D6);
-      sunLight.intensity = 1.05;
-      fillLight.intensity = 0.34;
+      hemiLight.color.setHex(0xFFF6E6);
+      hemiLight.groundColor.setHex(0x6D9458);
+      hemiLight.intensity = 0.62;
+      sunLight.color.setHex(0xFFE2B0);
+      sunLight.intensity = 1.35;
+      sunLight.position.set(15, 21, 12);
+      fillLight.color.setHex(0xB8DCF7);
+      fillLight.intensity = 0.25;
+      if (villagePointLight) villagePointLight.intensity = 0;
       starField.material.opacity = 0;
     }
 
-    // Warm windows & street lanterns
-    const winEmissive = isNight ? 1.15 : (isSunset ? 0.65 : 0.06);
+    // Position Sun / Moon disc in sky aligned with directional light
+    if (celestialDisc && celestialGlow) {
+      const skyPos = sunLight.position.clone().normalize().multiplyScalar(68);
+      celestialDisc.position.copy(skyPos);
+      celestialDisc.lookAt(0, 0, 0);
+      celestialGlow.position.copy(skyPos).multiplyScalar(1.01);
+      celestialGlow.lookAt(0, 0, 0);
+      if (isNight) {
+        celestialDisc.material.color.setHex(0xEDF4FF);
+        celestialGlow.material.color.setHex(0x8EB8E5);
+        celestialGlow.material.opacity = 0.18;
+      } else if (isSunset) {
+        celestialDisc.material.color.setHex(0xFFB673);
+        celestialGlow.material.color.setHex(0xFF9154);
+        celestialGlow.material.opacity = 0.28;
+      } else {
+        celestialDisc.material.color.setHex(0xFFF3C4);
+        celestialGlow.material.color.setHex(0xFFE69A);
+        celestialGlow.material.opacity = 0.22;
+      }
+    }
+
+    // Warm windows glow at sunset & night
+    const winEmissive = isNight ? 1.65 : (isSunset ? 0.95 : 0.03);
+    const winColor = isNight ? 0xFFF0C2 : (isSunset ? 0xFFE3A3 : 0x8BC1D6);
+    const winEmissiveCol = isNight ? 0xFFAE38 : 0xFFB84D;
     for (const rec of buildingRecords.values()) {
       (rec.group.userData.windowMats || []).forEach(mat => {
+        mat.color.setHex(winColor);
+        mat.emissive.setHex(winEmissiveCol);
         mat.emissiveIntensity = winEmissive;
       });
     }
@@ -1060,18 +1215,24 @@ const constructionAnimations = {};
     const lanternLit = isNight || isSunset;
     lanternRecords.forEach(l => {
       if (l.userData.bulbMat) {
-        l.userData.bulbMat.emissiveIntensity = lanternLit ? 1.4 : 0.15;
+        l.userData.bulbMat.emissiveIntensity = lanternLit ? 1.55 : 0.12;
       }
       if (l.userData.haloMesh) {
-        l.userData.haloMesh.material.opacity = lanternLit ? 0.28 : 0;
+        l.userData.haloMesh.material.opacity = lanternLit ? 0.42 : 0;
       }
     });
 
     if (fireflyPoints) {
-      fireflyPoints.visible = isNight && !!(state.enabledDecorations && state.enabledDecorations.deco_fireflies) && getDisplayedHours() >= 28;
+      const fireflyActive = (isSunset || isNight) && (!state.enabledDecorations || state.enabledDecorations.deco_fireflies !== false);
+      fireflyPoints.visible = fireflyActive;
+      if (fireflyActive) {
+        fireflyPoints.material.opacity = 0.55 + 0.35 * Math.sin(now * 0.004);
+      }
     }
     if (snowPoints) snowPoints.visible = season === 'winter';
     if (petalPoints) petalPoints.visible = season === 'spring';
+    if (pollenPoints) pollenPoints.visible = season === 'summer';
+    if (autumnPoints) autumnPoints.visible = season === 'autumn';
   }
 
   /* ------------------------------------------------------------------------
@@ -1281,24 +1442,50 @@ const constructionAnimations = {};
       }
     }
 
-    // 11. Weather particles
+    // 11. Weather & Seasonal Ambient Particles
     if (snowPoints && snowPoints.visible) {
       const arr = snowPoints.geometry.attributes.position.array;
       for (let i = 0; i < arr.length; i += 3) {
-        arr[i + 1] -= dt * 1.4;
+        arr[i + 1] -= dt * 1.3;
         arr[i] += Math.sin(now * 0.001 + i) * dt * 0.25;
-        if (arr[i + 1] < 0) arr[i + 1] = 10;
+        if (arr[i + 1] < 0) arr[i + 1] = 9.5;
       }
       snowPoints.geometry.attributes.position.needsUpdate = true;
     }
     if (petalPoints && petalPoints.visible) {
       const arr = petalPoints.geometry.attributes.position.array;
       for (let i = 0; i < arr.length; i += 3) {
-        arr[i + 1] -= dt * 0.95;
-        arr[i] += Math.cos(now * 0.0014 + i) * dt * 0.38;
-        if (arr[i + 1] < 0) arr[i + 1] = 10;
+        arr[i + 1] -= dt * 0.85;
+        arr[i] += Math.cos(now * 0.0014 + i) * dt * 0.35;
+        if (arr[i + 1] < 0) arr[i + 1] = 9.5;
       }
       petalPoints.geometry.attributes.position.needsUpdate = true;
+    }
+    if (pollenPoints && pollenPoints.visible) {
+      const arr = pollenPoints.geometry.attributes.position.array;
+      for (let i = 0; i < arr.length; i += 3) {
+        arr[i + 1] += Math.sin(now * 0.0012 + i) * dt * 0.22;
+        arr[i] += Math.cos(now * 0.0009 + i) * dt * 0.25;
+      }
+      pollenPoints.geometry.attributes.position.needsUpdate = true;
+    }
+    if (autumnPoints && autumnPoints.visible) {
+      const arr = autumnPoints.geometry.attributes.position.array;
+      for (let i = 0; i < arr.length; i += 3) {
+        arr[i + 1] -= dt * 0.95;
+        arr[i] += Math.sin(now * 0.0016 + i) * dt * 0.42;
+        if (arr[i + 1] < 0) arr[i + 1] = 9.5;
+      }
+      autumnPoints.geometry.attributes.position.needsUpdate = true;
+    }
+    if (fireflyPoints && fireflyPoints.visible) {
+      const arr = fireflyPoints.geometry.attributes.position.array;
+      for (let i = 0; i < arr.length; i += 3) {
+        arr[i] += Math.sin(now * 0.001 + i) * dt * 0.28;
+        arr[i + 1] += Math.cos(now * 0.0015 + i) * dt * 0.14;
+        arr[i + 2] += Math.cos(now * 0.0011 + i) * dt * 0.28;
+      }
+      fireflyPoints.geometry.attributes.position.needsUpdate = true;
     }
 
     // 12. Smooth Camera animation & OrbitControls clamping
@@ -1350,8 +1537,10 @@ const constructionAnimations = {};
         else if (kind === 'dog') label = `🐶 ${data.name} (¡Acariciar!)`;
         else if (kind === 'villager') label = `👋 ${data.name} · ${data.role}`;
         tooltip.textContent = label;
-        tooltip.style.left = `${Math.min(Math.max(12, clientX - rect.left + 14), rect.width - 220)}px`;
-        tooltip.style.top = `${Math.max(12, clientY - rect.top - 34)}px`;
+        const sx = clientX - rect.left;
+        const sy = clientY - rect.top;
+        tooltip.style.left = `${Math.min(Math.max(100, sx), rect.width - 100)}px`;
+        tooltip.style.top = `${Math.max(46, sy - 16)}px`;
         tooltip.classList.remove('hidden');
       }
     } else {
@@ -1604,8 +1793,8 @@ const constructionAnimations = {};
     }
 
     pop.classList.remove('hidden');
-    const left = Math.min(Math.max(12, sx - 130), maxW - 300);
-    const top = Math.min(Math.max(12, sy - 140), maxH - 170);
+    const left = Math.min(Math.max(12, sx - 144), maxW - 300);
+    const top = Math.min(Math.max(12, sy - 165), maxH - 190);
     pop.style.left = `${left}px`;
     pop.style.top = `${top}px`;
   };
@@ -1625,7 +1814,7 @@ const constructionAnimations = {};
         const size = 224;
         if (!miniRT) {
           miniRT = new THREE.WebGLRenderTarget(size, size);
-          miniRT.texture.encoding = THREE.sRGBEncoding;
+          window.VillageTextures.applySRGB(miniRT.texture);
           miniScene = new THREE.Scene();
           miniScene.background = new THREE.Color(0xE8F1E8);
           miniCam = new THREE.PerspectiveCamera(34, 1, 0.1, 40);
